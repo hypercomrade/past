@@ -1,10 +1,29 @@
 import re
+import subprocess
 from collections import Counter
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 
+def get_bash_history():
+    """Get bash history by running the history command"""
+    try:
+        # Run the bash history command and capture output
+        result = subprocess.run(['bash', '-i', '-c', 'history'],
+                               capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            return result.stdout
+        else:
+            print("Error running history command:", result.stderr)
+            return None
+    except Exception as e:
+        print(f"Error getting bash history: {e}")
+        return None
+
 def process_bash_history(history_text):
     """Process bash history and extract commands and keywords"""
+    if not history_text:
+        return [], []
+
     # Remove line numbers if present (from 'history' command output)
     lines = [line.strip() for line in history_text.split('\n') if line.strip()]
 
@@ -52,7 +71,8 @@ def visualize_commands(commands, words, top_n=20):
     # Plot top commands
     plt.subplot(2, 2, 1)
     top_commands = command_counts.most_common(top_n)
-    plt.barh([cmd[0] for cmd in top_commands], [cmd[1] for cmd in top_commands])
+    plt.barh([cmd[0][:50] + ('...' if len(cmd[0]) > 50 else '') for cmd in top_commands],
+             [cmd[1] for cmd in top_commands])
     plt.title(f'Top {top_n} Most Used Commands')
     plt.gca().invert_yaxis()
 
@@ -74,36 +94,28 @@ def visualize_commands(commands, words, top_n=20):
     plt.show()
 
 def main():
-    print("Bash History Analyzer")
-    print("Please paste your bash history (from the 'history' command) below.")
-    print("Press Ctrl+D (Unix) or Ctrl+Z then Enter (Windows) when finished.")
+    print("Bash History Analyzer - Loading your command history...")
 
-    # Read input from stdin
-    try:
-        history_text = []
-        while True:
-            try:
-                line = input()
-                history_text.append(line)
-            except EOFError:
-                break
-        history_text = '\n'.join(history_text)
-    except KeyboardInterrupt:
-        print("\nOperation cancelled by user.")
-        return
+    history_text = get_bash_history()
 
-    if not history_text.strip():
-        print("No input provided. Exiting.")
-        return
+    if not history_text:
+        print("Failed to get bash history. Trying fallback method...")
+        try:
+            with open(os.path.expanduser('~/.bash_history'), 'r', errors='ignore') as f:
+                history_text = f.read()
+        except Exception as e:
+            print(f"Error reading .bash_history file: {e}")
+            return
 
     commands, words = process_bash_history(history_text)
 
     if not commands:
-        print("No valid commands found in the input.")
+        print("No valid commands found in the history.")
         return
 
-    print(f"\nProcessed {len(commands)} commands with {len(words)} keywords.")
+    print(f"\nAnalyzed {len(commands)} commands with {len(words)} keywords.")
     visualize_commands(commands, words)
 
 if __name__ == "__main__":
+    import os
     main()
