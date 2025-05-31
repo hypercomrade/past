@@ -1,8 +1,20 @@
+#!/usr/bin/env python3
 import re
 import subprocess
 from collections import Counter
 import matplotlib.pyplot as plt
-import textwrap
+import numpy as np
+from matplotlib import cm
+import argparse
+import sys
+import os
+import json
+
+# Set global style parameters (only used if plotting)
+plt.style.use('seaborn-v0_8-pastel')
+plt.rcParams['font.family'] = 'DejaVu Sans'  # More modern font
+plt.rcParams['axes.titlepad'] = 20
+plt.rcParams['axes.labelpad'] = 10
 
 def get_bash_history():
     """Get bash history by running the history command"""
@@ -12,10 +24,10 @@ def get_bash_history():
         if result.returncode == 0:
             return result.stdout
         else:
-            print("Error running history command:", result.stderr)
+            print("Error running history command:", result.stderr, file=sys.stderr)
             return None
     except Exception as e:
-        print(f"Error getting bash history: {e}")
+        print(f"Error getting bash history: {e}", file=sys.stderr)
         return None
 
 def process_bash_history(history_text):
@@ -48,44 +60,44 @@ def process_bash_history(history_text):
     return commands, words
 
 def categorize_command(cmd):
-    """Enhanced command categorization with more niche commands and languages"""
+    """Categorize commands into common types"""
     cmd_lower = cmd.lower()
     
-    # Expanded Navigation commands
+    # Navigation commands
     nav_commands = ['cd ', 'ls', 'pwd', 'dir', 'pushd', 'popd', 'll', 'tree', 'exa', 'fd', 'ranger', 'nnn', 'lf']
     if any(x in cmd_lower for x in nav_commands):
         return 'Navigation'
     
-    # Expanded File operations
+    # File operations
     file_ops = ['cp ', 'mv ', 'rm ', 'mkdir', 'touch', 'chmod', 'chown', 'ln ', 'rsync', 'tar ', 
                 'gzip', 'gunzip', 'zip', 'unzip', '7z', 'rename', 'trash', 'shred']
     if any(x in cmd_lower for x in file_ops):
-        return 'File Operations'
+        return 'File Ops'
     
-    # Expanded Editors
+    # Editors
     editors = ['vim ', 'nano ', 'emacs', 'code ', 'subl ', 'gedit', 'pico', 'vi', 'micro', 'kate', 
                'atom', 'neovim', 'nano', 'ed', 'sed ', 'awk ']
     if any(x in cmd_lower for x in editors):
         return 'Editors'
     
-    # Expanded Version control
+    # Version control
     vcs = ['git ', 'hg ', 'svn ', 'fossil', 'bzr', 'cvs', 'darcs', 'git-lfs', 'git-flow']
     if any(x in cmd_lower for x in vcs):
-        return 'Version Control'
+        return 'Version Ctrl'
     
-    # Expanded Package management
+    # Package management
     package_managers = ['apt', 'yum', 'dnf', 'pacman', 'brew', 'pip ', 'npm ', 'snap', 'flatpak', 
                         'zypper', 'port', 'apk', 'dpkg', 'rpm', 'gem', 'cargo', 'go ', 'dotnet']
     if any(x in cmd_lower for x in package_managers):
-        return 'Package Management'
+        return 'Pkg Mgmt'
     
-    # Expanded System monitoring
+    # System monitoring
     system_monitors = ['top', 'htop', 'ps ', 'kill', 'df ', 'du ', 'free', 'btop', 'glances', 'nmon', 
                       'iotop', 'iftop', 'nethogs', 'vmstat', 'iostat', 'dstat', 'sar', 'mpstat', 'pidstat']
     if any(x in cmd_lower for x in system_monitors):
-        return 'System Monitoring'
+        return 'Sys Monitor'
     
-    # Expanded Network
+    # Network
     network_commands = ['ssh ', 'scp ', 'ping', 'curl', 'wget', 'ifconfig', 'ip ', 'sftp', 'ftp', 'telnet', 
                         'netstat', 'ss', 'traceroute', 'tracepath', 'mtr', 'dig', 'nslookup', 'nmcli', 'iwconfig']
     if any(x in cmd_lower for x in network_commands):
@@ -116,7 +128,7 @@ def categorize_command(cmd):
     
     for lang, keywords in languages.items():
         if any(x in cmd_lower for x in keywords):
-            return f'Language: {lang}'
+            return f'Lang: {lang}'
     
     # Databases
     databases = ['mysql', 'psql', 'sqlite3', 'mongo', 'redis-cli', 'sqlcmd', 'clickhouse-client', 
@@ -128,7 +140,7 @@ def categorize_command(cmd):
     containers = ['docker ', 'podman', 'kubectl', 'oc ', 'ctr', 'nerdctl', 'lxc', 'lxd', 'vagrant', 
                   'virsh', 'qemu', 'lima', 'colima']
     if any(x in cmd_lower for x in containers):
-        return 'Containers/Virtualization'
+        return 'Containers'
     
     # Shell builtins
     shell_builtins = ['export', 'source', 'alias', 'echo', 'printf', 'read', 'set', 'unset', 'type', 
@@ -139,7 +151,7 @@ def categorize_command(cmd):
     # If none match
     return 'Other'
 
-def print_statistics(commands, words, category_counts):
+def print_statistics(commands, words, category_counts, output_format='text'):
     """Print comprehensive statistics about the command history"""
     total_commands = len(commands)
     unique_commands = len(set(commands))
@@ -148,139 +160,269 @@ def print_statistics(commands, words, category_counts):
     
     # Calculate most frequent commands
     command_counts = Counter(commands)
-    top_commands = command_counts.most_common(5)
+    top_commands = command_counts.most_common(10)
     
     # Calculate most frequent words
     word_counts = Counter(words)
-    top_words = word_counts.most_common(5)
+    top_words = word_counts.most_common(10)
     
     # Calculate category distribution
     total_categories = sum(category_counts.values())
-    top_categories = category_counts.most_common(5)
+    top_categories = category_counts.most_common(10)
     
-    # Prepare statistics text
+    if output_format == 'json':
+        result = {
+            'summary': {
+                'total_commands': total_commands,
+                'unique_commands': unique_commands,
+                'command_variety': unique_commands/total_commands,
+                'total_keywords': total_words,
+                'unique_keywords': unique_words,
+                'keyword_variety': unique_words/total_words
+            },
+            'top_commands': [{'command': cmd[0], 'count': cmd[1]} for cmd in top_commands],
+            'top_words': [{'word': word[0], 'count': word[1]} for word in top_words],
+            'top_categories': [{'category': cat[0], 'count': cat[1]} for cat in top_categories],
+            'all_categories': {cat[0]: cat[1] for cat in category_counts.most_common()}
+        }
+        print(json.dumps(result, indent=2))
+        return
+    
+    # Prepare statistics text with box
     stats = [
-        "=== Command History Statistics ===",
-        f"Total commands analyzed: {total_commands}",
-        f"Unique commands: {unique_commands} ({unique_commands/total_commands:.1%})",
-        f"Total words/tokens: {total_words}",
-        f"Unique words/tokens: {unique_words} ({unique_words/total_words:.1%})",
-        "",
-        "Top 5 Commands:",
-        *[f"  {cmd[0]}: {cmd[1]} uses ({cmd[1]/total_commands:.1%})" for cmd in top_commands],
-        "",
-        "Top 5 Keywords:",
-        *[f"  {word[0]}: {word[1]} uses ({word[1]/total_words:.1%})" for word in top_words],
-        "",
-        "Top 5 Categories:",
-        *[f"  {cat[0]}: {cat[1]} commands ({cat[1]/total_categories:.1%})" for cat in top_categories],
-        "",
-        "=== Detailed Category Breakdown ===",
-        *[f"{cat[0]}: {cat[1]} commands ({cat[1]/total_categories:.1%})" for cat in category_counts.most_common()],
-        "",
-        f"Average commands per category: {total_categories/len(category_counts):.1f}",
-        f"Most common category: {category_counts.most_common(1)[0][0]} ({category_counts.most_common(1)[0][1]} commands)",
-        f"Least common category: {category_counts.most_common()[-1][0]} ({category_counts.most_common()[-1][1]} commands)"
+        "╔════════════════════════════════════════════╗",
+        "║          COMMAND HISTORY ANALYSIS          ║",
+        "╟────────────────────────────────────────────╢",
+        f"║ {'Total commands:':<20} {total_commands:>12,} ║",
+        f"║ {'Unique commands:':<20} {unique_commands:>12,} ║",
+        f"║ {'Command variety:':<20} {unique_commands/total_commands:>12.1%} ║",
+        "╟────────────────────────────────────────────╢",
+        f"║ {'Total keywords:':<20} {total_words:>12,} ║",
+        f"║ {'Unique keywords:':<20} {unique_words:>12,} ║",
+        f"║ {'Keyword variety:':<20} {unique_words/total_words:>12.1%} ║",
+        "╟────────────────────────────────────────────╢",
+        "║           MOST FREQUENT COMMANDS           ║",
     ]
     
-    # Print with wrapping for better readability
-    wrapper = textwrap.TextWrapper(width=80, subsequent_indent='  ')
-    for line in stats:
-        print(wrapper.fill(line))
+    # Add top commands
+    for i, cmd in enumerate(top_commands):
+        cmd_text = f"{i+1}. {cmd[0][:30]:<33}{cmd[1]:>5,}"
+        stats.append(f"║ {cmd_text} ║")
+    
+    stats.append("╟────────────────────────────────────────────╢")
+    stats.append("║            MOST FREQUENT WORDS             ║")
+    
+    # Add top words
+    for i, word in enumerate(top_words):
+        word_text = f"{i+1}. {word[0][:30]:<33}{word[1]:>5,}"
+        stats.append(f"║ {word_text} ║")
+    
+    stats.append("╟────────────────────────────────────────────╢")
+    stats.append("║             TOP CATEGORIES                 ║")
+    
+    # Add top categories
+    for i, cat in enumerate(top_categories):
+        cat_text = f"{i+1}. {cat[0][:30]:<33}{cat[1]:>5,}"
+        stats.append(f"║ {cat_text} ║")
+    
+    stats.append("╚════════════════════════════════════════════╝")
+    
+    # Print with colored output if available and not json
+    try:
+        from termcolor import colored
+        print(colored('\n'.join(stats), 'cyan', attrs=['bold']))
+    except ImportError:
+        print('\n'.join(stats))
 
-def visualize_commands(commands, words, top_n=15):
-    """Create visualizations with pie charts and statistics"""
+def create_donut_chart(ax, data, title, colors=None):
+    """Create a donut chart with better label placement"""
+    labels = [x[0] for x in data]
+    sizes = [x[1] for x in data]
+    total = sum(sizes)
+    
+    # Generate colors if not provided
+    if not colors:
+        colors = cm.Pastel1(np.linspace(0, 1, len(labels)))
+    
+    # Create pie chart (donut)
+    wedges, texts, autotexts = ax.pie(
+        sizes, 
+        labels=labels,
+        autopct=lambda p: f'{p:.1f}%' if p >= 5 else '',
+        startangle=90,
+        wedgeprops=dict(width=0.5, edgecolor='white'),
+        colors=colors,
+        textprops={'fontsize': 9, 'fontweight': 'bold'},
+        pctdistance=0.85
+    )
+    
+    # Improve label placement
+    for text in texts:
+        text.set_fontsize(8)
+        text.set_fontweight('normal')
+    
+    # Add title
+    ax.set_title(title, fontsize=12, fontweight='bold', pad=20)
+    
+    # Equal aspect ratio ensures the pie is drawn as a circle
+    ax.axis('equal')
+    
+    # Add center text with total count
+    centre_circle = plt.Circle((0,0), 0.3, fc='white')
+    ax.add_artist(centre_circle)
+    ax.text(0, 0, f"Total:\n{total}", ha='center', va='center', fontsize=10, fontweight='bold')
+
+def create_bar_chart(ax, data, title, color):
+    """Create a horizontal bar chart"""
+    labels = [x[0] for x in data]
+    values = [x[1] for x in data]
+    y_pos = np.arange(len(labels))
+    
+    bars = ax.barh(y_pos, values, color=color, edgecolor='white')
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontsize=9)
+    ax.invert_yaxis()
+    ax.set_title(title, fontsize=12, fontweight='bold', pad=15)
+    
+    # Add value labels
+    for bar in bars:
+        width = bar.get_width()
+        ax.text(width + max(values)*0.01, bar.get_y() + bar.get_height()/2,
+                f'{width:,}', va='center', fontsize=8)
+    
+    # Remove spines and ticks
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.xaxis.set_ticks_position('none')
+
+def generate_visualizations(commands, words, output_file=None, top_n=15):
+    """Create professional visualizations with multiple chart types"""
     # Count command categories
     categories = [categorize_command(cmd) for cmd in commands]
-    category_counts = Counter(categories)
+    category_counts = Counter(categories).most_common()
     
     # Count word usage
-    word_counts = Counter(words)
+    word_counts = Counter(words).most_common(top_n)
     
-    # Set up the figure with 3 subplots (2 pie charts and text area)
-    plt.figure(figsize=(18, 10))
+    # Count command usage
+    command_counts = Counter(commands).most_common(top_n)
     
-    # Plot top commands by category (pie chart)
-    plt.subplot(1, 3, 1)
-    top_categories = category_counts.most_common()
-    labels = [cat[0] for cat in top_categories]
-    sizes = [cat[1] for cat in top_categories]
+    # Set up the figure with a grid layout
+    fig = plt.figure(figsize=(18, 12), facecolor='#f5f5f5')
+    fig.suptitle('Bash Command History Analysis', fontsize=16, fontweight='bold', y=0.98)
     
-    # Only show labels for categories with >5% of total
-    total = sum(sizes)
-    def autopct_format(pct):
-        return f'{pct:.1f}%' if pct > 5 else ''
+    # Create grid layout
+    gs = fig.add_gridspec(2, 3, height_ratios=[3, 1])
     
-    plt.pie(sizes, labels=labels, autopct=autopct_format,
-            startangle=90, wedgeprops={'edgecolor': 'white'})
-    plt.title('Command Categories Distribution')
-    plt.axis('equal')
+    # Donut chart for categories
+    ax1 = fig.add_subplot(gs[0, 0])
+    create_donut_chart(ax1, category_counts, 'Command Categories')
     
-    # Plot top keywords (pie chart)
-    plt.subplot(1, 3, 2)
-    top_words = word_counts.most_common(top_n)
-    word_labels = [word[0] for word in top_words]
-    word_sizes = [word[1] for word in top_words]
+    # Donut chart for keywords
+    ax2 = fig.add_subplot(gs[0, 1])
+    create_donut_chart(ax2, word_counts, f'Top {top_n} Keywords')
     
-    plt.pie(word_sizes, labels=word_labels, autopct='%1.1f%%',
-            startangle=90, wedgeprops={'edgecolor': 'white'})
-    plt.title(f'Top {top_n} Command Keywords')
-    plt.axis('equal')
+    # Bar chart for top commands
+    ax3 = fig.add_subplot(gs[0, 2])
+    create_bar_chart(ax3, command_counts, f'Top {top_n} Commands', '#8da0cb')
     
-    # Add statistics text
-    plt.subplot(1, 3, 3)
+    # Statistics text
+    ax4 = fig.add_subplot(gs[1, :])
     stats_text = [
-        f"Total commands: {len(commands)}",
-        f"Unique commands: {len(set(commands))}",
-        f"Total keywords: {len(words)}",
-        f"Unique keywords: {len(set(words))}",
-        f"Categories found: {len(category_counts)}",
-        "",
-        "Top Categories:",
-        *[f"- {cat[0]}: {cat[1]} ({cat[1]/total:.1%})" for cat in category_counts.most_common(5)],
-        "",
-        "Most Used Commands:",
-        *[f"- {cmd[0]}: {cmd[1]}" for cmd in Counter(commands).most_common(5)],
-        "",
-        "Most Used Keywords:",
-        *[f"- {word[0]}: {word[1]}" for word in word_counts.most_common(5)]
+        f"Total Commands: {len(commands):,} | Unique: {len(set(commands)):,}",
+        f"Total Keywords: {len(words):,} | Unique: {len(set(words)):,}",
+        f"Categories Found: {len(category_counts)} | Most Used: {category_counts[0][0]} ({category_counts[0][1]:,})",
+        f"Analysis Date: {subprocess.getoutput('date')}"
     ]
-    
-    plt.text(0.1, 0.95, "\n".join(stats_text), 
-             ha='left', va='top', fontfamily='monospace', fontsize=10)
-    plt.axis('off')
-    plt.title('Command History Statistics')
+    ax4.text(0.5, 0.5, '\n'.join(stats_text), 
+             ha='center', va='center', fontsize=11, 
+             bbox=dict(facecolor='white', alpha=0.8, edgecolor='lightgray', boxstyle='round'))
+    ax4.axis('off')
     
     plt.tight_layout()
-    plt.show()
+    plt.subplots_adjust(top=0.92, hspace=0.3)
     
-    # Print detailed statistics to console
-    print("\nDetailed Statistics:")
-    print_statistics(commands, words, category_counts)
+    # Add watermark
+    fig.text(0.95, 0.05, 'Bash History Analyzer', 
+             fontsize=12, color='gray', ha='right', va='bottom', alpha=0.5)
+    
+    if output_file:
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"Visualization saved to {output_file}", file=sys.stderr)
+    else:
+        plt.show()
 
 def main():
-    print("Bash History Analyzer - Loading your command history...")
+    parser = argparse.ArgumentParser(
+        description='Analyze bash command history with various output options',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument('-f', '--file', help='Use a specific history file instead of live bash history')
+    parser.add_argument('-o', '--output', help='Output file for visualization (PNG, JPG, SVG, PDF)')
+    parser.add_argument('-n', '--top-n', type=int, default=15, 
+                       help='Number of top commands/words to display')
+    parser.add_argument('-j', '--json', action='store_true', 
+                       help='Output results in JSON format')
+    parser.add_argument('-v', '--visualize', action='store_true', 
+                       help='Generate visualizations (interactive or to file if --output specified)')
+    parser.add_argument('-q', '--quiet', action='store_true', 
+                       help='Suppress all non-essential output (except JSON if requested)')
     
-    history_text = get_bash_history()
+    args = parser.parse_args()
     
-    if not history_text:
-        print("Failed to get bash history. Trying fallback method...")
+    if not args.quiet:
+        print("Bash History Analyzer - Loading your command history...", file=sys.stderr)
+    
+    if args.file:
         try:
-            with open(os.path.expanduser('~/.bash_history'), 'r', errors='ignore') as f:
+            with open(os.path.expanduser(args.file), 'r', errors='ignore') as f:
                 history_text = f.read()
         except Exception as e:
-            print(f"Error reading .bash_history file: {e}")
-            return
+            print(f"Error reading history file: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        history_text = get_bash_history()
+        if not history_text:
+            if not args.quiet:
+                print("Failed to get live bash history. Trying fallback method...", file=sys.stderr)
+            try:
+                with open(os.path.expanduser('~/.bash_history'), 'r', errors='ignore') as f:
+                    history_text = f.read()
+            except Exception as e:
+                print(f"Error reading .bash_history file: {e}", file=sys.stderr)
+                sys.exit(1)
     
     commands, words = process_bash_history(history_text)
     
     if not commands:
-        print("No valid commands found in the history.")
-        return
+        print("No valid commands found in the history.", file=sys.stderr)
+        sys.exit(1)
     
-    print(f"\nAnalyzed {len(commands)} commands with {len(words)} keywords.")
-    visualize_commands(commands, words)
+    if not args.quiet:
+        print(f"\nAnalyzed {len(commands)} commands with {len(words)} keywords.", file=sys.stderr)
+    
+    # Get categories for statistics
+    categories = [categorize_command(cmd) for cmd in commands]
+    category_counts = Counter(categories)
+    
+    # Handle output options
+    if args.json:
+        print_statistics(commands, words, category_counts, output_format='json')
+    elif not args.quiet:
+        print_statistics(commands, words, category_counts)
+    
+    # Handle visualization
+    if args.visualize or args.output:
+        if args.output and not args.output.lower().endswith(('.png', '.jpg', '.jpeg', '.svg', '.pdf')):
+            print("Error: Output file must have .png, .jpg, .svg, or .pdf extension", file=sys.stderr)
+            sys.exit(1)
+        
+        try:
+            generate_visualizations(commands, words, output_file=args.output, top_n=args.top_n)
+        except Exception as e:
+            print(f"Error generating visualization: {e}", file=sys.stderr)
+            sys.exit(1)
 
 if __name__ == "__main__":
-    import os
     main()
