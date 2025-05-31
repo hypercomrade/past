@@ -51,7 +51,7 @@ def categorize_command(cmd):
     cmd_lower = cmd.lower()
     
     # Navigation commands
-    if any(x in cmd_lower for x in ['cd ', 'ls', 'pwd', 'dir', 'pushd', 'popd']):
+    if any(x in cmd_lower for x in ['cd ', 'ls', 'pwd', 'dir', 'pushd', 'popd', 'll']):
         return 'Navigation'
     
     # File operations
@@ -59,7 +59,7 @@ def categorize_command(cmd):
         return 'File Operations'
     
     # Editors
-    if any(x in cmd_lower for x in ['vim ', 'nano ', 'emacs', 'code ', 'subl ', 'gedit']):
+    if any(x in cmd_lower for x in ['vim ', 'nano ', 'emacs', 'code ', 'subl ', 'gedit', 'pico', 'vi']):
         return 'Editors'
     
     # Version control
@@ -71,15 +71,15 @@ def categorize_command(cmd):
         return 'Package Management'
     
     # System monitoring
-    if any(x in cmd_lower for x in ['top', 'htop', 'ps ', 'kill', 'df ', 'du ', 'free']):
+    if any(x in cmd_lower for x in ['top', 'htop', 'ps ', 'kill', 'df ', 'du ', 'free', 'btop', 'glances']):
         return 'System Monitoring'
     
     # Network
-    if any(x in cmd_lower for x in ['ssh ', 'scp ', 'ping', 'curl', 'wget', 'ifconfig', 'ip ']):
+    if any(x in cmd_lower for x in ['ssh ', 'scp ', 'ping', 'curl', 'wget', 'ifconfig', 'ip ', 'sftp']):
         return 'Network'
     
     # Python
-    if any(x in cmd_lower for x in ['python', 'pip', 'py ', 'python3']):
+    if any(x in cmd_lower for x in ['python', 'pip', 'py ', 'python3', 'python2']):
         return 'Python'
     
     # Shell builtins
