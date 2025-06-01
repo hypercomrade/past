@@ -12,19 +12,35 @@ use clap::{Arg, App};
 use thousands::Separable;
 
 fn get_bash_history() -> Result<String, Box<dyn Error>> {
-    let output = Command::new("bash")
+    // Try reading directly from history file first
+    let home = env::var("HOME")?;
+    let history_path = Path::new(&home).join(".bash_history");
+    
+    // First try reading directly from the history file
+    if let Ok(mut file) = File::open(&history_path) {
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        if !contents.is_empty() {
+            return Ok(contents);
+        }
+    }
+
+    // Fall back to trying the history command
+    match Command::new("bash")
         .arg("-i")
         .arg("-c")
-        .arg("history")
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8(output.stdout)?)
-    } else {
-        Err(Box::new(io::Error::new(
-            io::ErrorKind::Other,
-            String::from_utf8(output.stderr)?,
-        )))
+        .arg("history -r; history")
+        .output() {
+        Ok(output) if output.status.success() => {
+            Ok(String::from_utf8(output.stdout)?)
+        },
+        _ => {
+            // Final fallback - try reading .bash_history again
+            let mut file = File::open(&history_path)?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            Ok(contents)
+        }
     }
 }
 
@@ -40,10 +56,19 @@ fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
 
     for line in lines {
         let command = if num_re.is_match(line) {
+            // Format with line numbers: "  123  command"
             num_re.replace(line, "").into_owned()
         } else if comment_re.is_match(line) {
+            // Skip timestamp lines: "#1645483932"
             continue;
+        } else if line.starts_with(':') && line.contains(';') {
+            // Format from .bash_history: ": 1645483932:0;command"
+            match line.splitn(3, ';').nth(2) {
+                Some(cmd) => cmd.to_string(),
+                None => continue,
+            }
         } else {
+            // Plain command without any prefixes
             line.to_string()
         };
         commands.push(command.trim().to_string());
@@ -197,7 +222,7 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
     let top_words = word_counts.iter().take(10).collect::<Vec<_>>();
 
     // Calculate category distribution
-    let total_categories: usize = category_counts.values().sum();
+    let _total_categories: usize = category_counts.values().sum();
     let mut category_counts: Vec<_> = category_counts.iter().collect();
     category_counts.sort_by(|a, b| b.1.cmp(a.1));
     let top_categories = category_counts.iter().take(10).collect::<Vec<_>>();
@@ -334,10 +359,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         contents
     } else {
         match get_bash_history() {
-            Ok(text) => text,
+            Ok(text) => {
+                if text.trim().is_empty() {
+                    eprintln!("Warning: Retrieved empty history. Trying fallback method...");
+                    let home = env::var("HOME")?;
+                    let mut file = File::open(Path::new(&home).join(".bash_history"))?;
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents)?;
+                    contents
+                } else {
+                    text
+                }
+            },
             Err(e) => {
                 if !quiet {
-                    eprintln!("Failed to get live bash history. Trying fallback method...: {}", e);
+                    eprintln!("Failed to get live bash history ({}). Trying fallback method...", e);
                 }
                 let home = env::var("HOME")?;
                 let mut file = File::open(Path::new(&home).join(".bash_history"))?;
