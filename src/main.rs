@@ -7,10 +7,10 @@ use std::env;
 use std::error::Error;
 use regex::Regex;
 use serde_json::{json, Value};
-use clap::{Arg, App, ArgMatches};
+use clap::{Arg, App, ArgMatches, AppSettings};
 use thousands::Separable;
 
-fn get_bash_history() -> Result<String, Box<dyn Error>> {
+fn get_bash_history() -> Result<String, Box<dyn Error>> { 
     let home = env::var("HOME")?;
     let history_path = Path::new(&home).join(".bash_history");
     
@@ -39,6 +39,7 @@ fn get_bash_history() -> Result<String, Box<dyn Error>> {
     }
 }
 
+// Does most of the heavy lifting for past //
 fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
     if history_text.is_empty() {
         return (Vec::new(), Vec::new());
@@ -46,6 +47,7 @@ fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
 
     let lines: Vec<&str> = history_text.lines().filter(|line| !line.trim().is_empty()).collect();
     let mut commands = Vec::new();
+    // Gross, regex //
     let num_re = Regex::new(r"^\s*\d+\s+").unwrap();
     let comment_re = Regex::new(r"^#\d+").unwrap();
 
@@ -84,6 +86,7 @@ fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
     (commands, words)
 }
 
+// How we currently classify commands (to be expanded) //
 fn categorize_command(cmd: &str) -> String {
     let cmd_lower = cmd.to_lowercase();
     let nav_commands = ["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
@@ -116,6 +119,7 @@ fn categorize_command(cmd: &str) -> String {
     if containers.iter().any(|&x| cmd_lower.contains(x)) { return "Containers".to_string(); }
     if shell_builtins.iter().any(|&x| cmd_lower.contains(x)) { return "Shell Builtins".to_string(); }
 
+    // Language hashmap (to be expanded) //
     let languages: HashMap<&str, Vec<&str>> = [
         ("Python", vec!["python", "pip", "py ", "python3", "python2", "pylint", "pyflakes", "mypy", "black"]),
         ("Java", vec!["java ", "javac", "mvn ", "gradle", "ant ", "jbang", "groovy"]),
@@ -154,7 +158,6 @@ fn print_brief_stats(commands: &[String], words: &[String]) {
     println!("Commands: {} ({} unique)", commands.len(), unique_commands);
     println!("Keywords: {} ({} unique)", words.len(), unique_words);
     
-    // Calculate command length statistics
     let avg_len = commands.iter().map(|c| c.len()).sum::<usize>() as f64 / commands.len() as f64;
     let max_len = commands.iter().map(|c| c.len()).max().unwrap_or(0);
     let min_len = commands.iter().map(|c| c.len()).min().unwrap_or(0);
@@ -163,19 +166,16 @@ fn print_brief_stats(commands: &[String], words: &[String]) {
 }
 
 fn print_detailed_analysis(commands: &[String], words: &[String], category_counts: &HashMap<String, usize>) {
-    // Calculate basic statistics
     let total_commands = commands.len();
     let unique_commands = commands.iter().collect::<HashSet<_>>().len();
     let total_words = words.len();
     let unique_words = words.iter().collect::<HashSet<_>>().len();
     
-    // Command complexity analysis
     let cmd_lengths: Vec<usize> = commands.iter().map(|c| c.len()).collect();
     let avg_length = cmd_lengths.iter().sum::<usize>() as f64 / total_commands as f64;
     let max_length = *cmd_lengths.iter().max().unwrap_or(&0);
     let min_length = *cmd_lengths.iter().min().unwrap_or(&0);
     
-    // Word frequency analysis
     let mut word_counts = HashMap::new();
     for word in words {
         *word_counts.entry(word.clone()).or_insert(0) += 1;
@@ -188,7 +188,6 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
     
     println!("\n\x1b[1;34m=== DETAILED ANALYSIS ===\x1b[0m");
     
-    // Basic statistics
     println!("\n\x1b[1mBasic Statistics:\x1b[0m");
     println!("- Total commands: {}", total_commands.separate_with_commas());
     println!("- Unique commands: {} ({:.1}% variety)", 
@@ -199,13 +198,11 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
         unique_words.separate_with_commas(),
         (unique_words as f64 / total_words as f64) * 100.0);
     
-    // Command complexity
     println!("\n\x1b[1mCommand Complexity:\x1b[0m");
     println!("- Average length: {:.1} characters", avg_length);
     println!("- Shortest command: {} chars", min_length);
     println!("- Longest command: {} chars", max_length);
     
-    // Category breakdown
     println!("\n\x1b[1mCategory Distribution:\x1b[0m");
     let total_categories: usize = category_counts.values().sum();
     let mut sorted_categories: Vec<_> = category_counts.iter().collect();
@@ -216,7 +213,6 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
         println!("- {:20}: {:>5} ({:>5.1}%)", category, count.separate_with_commas(), percentage);
     }
     
-    // Top words
     println!("\n\x1b[1mTop Keywords:\x1b[0m");
     for (i, (word, count)) in top_words.iter().enumerate() {
         println!("{}. {:20} {:>5}x", i+1, word, count.separate_with_commas());
@@ -246,7 +242,6 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
         return;
     }
 
-    // Default output (similar to original box output)
     let total_commands = commands.len();
     let unique_commands = commands.iter().collect::<HashSet<_>>().len();
     let total_words = words.len();
@@ -254,7 +249,7 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
 
     let mut stats = vec![
         "╔════════════════════════════════════════════╗".to_string(),
-        "║          COMMAND HISTORY ANALYSIS          ║".to_string(),
+        "║               COMMAND PAST                ║".to_string(),
         "╟────────────────────────────────────────────╢".to_string(),
         format!("║ {:<20} {:>12} ║", "Total commands:", total_commands.separate_with_commas()),
         format!("║ {:<20} {:>12} ║", "Unique commands:", unique_commands.separate_with_commas()),
@@ -272,42 +267,41 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Bash History Analyzer")
-        .version("1.0")
-        .author("Your Name")
-        .about("Analyze bash command history with various output options")
+    let matches = App::new("past")
+        .version("0.1")
+        .author("Mikhail Ukrainetz <mckaylbing@gmail.com>")
+        .about("The history analysis command for Unix")
+        .setting(AppSettings::ArgRequiredElseHelp)
+        .setting(AppSettings::ColoredHelp)
         .arg(Arg::with_name("file")
-             .short("f")
-             .long("file")
-             .value_name("FILE")
-             .help("Use a specific history file instead of live bash history")
-             .takes_value(true))
-        .arg(Arg::with_name("output")
-             .short("o")
-             .long("output")
-             .value_name("FILE")
-             .help("Output file for visualization (PNG, JPG, SVG, PDF)")
-             .takes_value(true))
+            .short("f")
+            .long("file")
+            .value_name("FILE")
+            .help("Use specific history file")
+            .takes_value(true))
         .arg(Arg::with_name("json")
-             .short("j")
-             .long("json")
-             .help("Output results in JSON format"))
+            .short("j")
+            .long("json")
+            .help("Output in JSON format"))
         .arg(Arg::with_name("brief")
-             .long("brief")
-             .help("Show only minimal summary output"))
+            .short("b")
+            .long("brief")
+            .help("Show brief summary only"))
         .arg(Arg::with_name("detailed")
-             .long("detailed")
-             .help("Show extended detailed analysis"))
+            .short("d")
+            .long("detailed")
+            .help("Show detailed analysis"))
         .arg(Arg::with_name("quiet")
-             .short("q")
-             .long("quiet")
-             .help("Suppress all non-essential output (except JSON if requested)"))
+            .short("q")
+            .long("quiet")
+            .help("Suppress non-essential output"))
+        .after_help("EXAMPLES:\n  past -b       # Brief summary\n  past -d       # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history")
         .get_matches();
 
     let quiet = matches.is_present("quiet");
 
     if !quiet && !matches.is_present("brief") {
-        eprintln!("Bash History Analyzer - Loading your command history...");
+        eprintln!("Analyzing your command history...");
     }
 
     let history_text = if let Some(file) = matches.value_of("file") {
