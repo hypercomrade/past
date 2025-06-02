@@ -1,16 +1,16 @@
 use std::collections::{HashMap, HashSet};
-use std::process::Command;
+use std::error::Error;
+use std::io::Read;
 use std::fs::File;
-use std::io::{self, Read};
 use std::path::Path;
 use std::env;
-use std::error::Error;
+use std::process::Command;
 use regex::Regex;
-use serde_json::{json, Value};
+use serde_json::json;
 use clap::{Arg, App, ArgMatches, AppSettings};
 use thousands::Separable;
 
-fn get_bash_history() -> Result<String, Box<dyn Error>> { 
+fn get_bash_history() -> Result<String, Box<dyn Error>> {
     let home = env::var("HOME")?;
     let history_path = Path::new(&home).join(".bash_history");
     
@@ -39,7 +39,6 @@ fn get_bash_history() -> Result<String, Box<dyn Error>> {
     }
 }
 
-// Does most of the heavy lifting for past //
 fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
     if history_text.is_empty() {
         return (Vec::new(), Vec::new());
@@ -47,7 +46,6 @@ fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
 
     let lines: Vec<&str> = history_text.lines().filter(|line| !line.trim().is_empty()).collect();
     let mut commands = Vec::new();
-    // Gross, regex //
     let num_re = Regex::new(r"^\s*\d+\s+").unwrap();
     let comment_re = Regex::new(r"^#\d+").unwrap();
 
@@ -86,7 +84,6 @@ fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
     (commands, words)
 }
 
-// How we currently classify commands (to be expanded) //
 fn categorize_command(cmd: &str) -> String {
     let cmd_lower = cmd.to_lowercase();
     let nav_commands = ["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
@@ -119,7 +116,6 @@ fn categorize_command(cmd: &str) -> String {
     if containers.iter().any(|&x| cmd_lower.contains(x)) { return "Containers".to_string(); }
     if shell_builtins.iter().any(|&x| cmd_lower.contains(x)) { return "Shell Builtins".to_string(); }
 
-    // Language hashmap (to be expanded) //
     let languages: HashMap<&str, Vec<&str>> = [
         ("Python", vec!["python", "pip", "py ", "python3", "python2", "pylint", "pyflakes", "mypy", "black"]),
         ("Java", vec!["java ", "javac", "mvn ", "gradle", "ant ", "jbang", "groovy"]),
@@ -219,35 +215,40 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
     }
 }
 
-fn print_statistics(commands: &[String], words: &[String], category_counts: &HashMap<String, usize>, matches: &ArgMatches) {
-    if matches.is_present("json") {
-        let result = json!({
-            "commands": commands.len(),
-            "unique_commands": commands.iter().collect::<HashSet<_>>().len(),
-            "words": words.len(),
-            "unique_words": words.iter().collect::<HashSet<_>>().len(),
-            "categories": category_counts
-        });
-        println!("{}", serde_json::to_string_pretty(&result).unwrap());
-        return;
-    }
-
-    if matches.is_present("brief") {
-        print_brief_stats(commands, words);
-        return;
-    }
-
-    if matches.is_present("detailed") {
-        print_detailed_analysis(commands, words, category_counts);
-        return;
-    }
-
+fn print_bare_stats(commands: &[String], words: &[String], category_counts: &HashMap<String, usize>) {
     let total_commands = commands.len();
     let unique_commands = commands.iter().collect::<HashSet<_>>().len();
     let total_words = words.len();
     let unique_words = words.iter().collect::<HashSet<_>>().len();
 
-    let mut stats = vec![
+    println!("COMMAND STATISTICS");
+    println!("------------------");
+    println!("Total commands: {}", total_commands);
+    println!("Unique commands: {}", unique_commands);
+    println!("Command variety: {:.1}%", (unique_commands as f64 / total_commands as f64) * 100.0);
+    println!("Total keywords: {}", total_words);
+    println!("Unique keywords: {}", unique_words);
+    println!("Keyword variety: {:.1}%", (unique_words as f64 / total_words as f64) * 100.0);
+    
+    let cmd_lengths: Vec<usize> = commands.iter().map(|c| c.len()).collect();
+    let avg_length = cmd_lengths.iter().sum::<usize>() as f64 / total_commands as f64;
+    println!("Avg command length: {:.1} chars", avg_length);
+    
+    println!("\nTOP CATEGORIES:");
+    let mut sorted_categories: Vec<_> = category_counts.iter().collect();
+    sorted_categories.sort_by(|a, b| b.1.cmp(a.1));
+    for (category, count) in sorted_categories.iter().take(5) {
+        println!("{}: {}", category, count);
+    }
+}
+
+fn print_boxed_stats(commands: &[String], words: &[String]) {
+    let total_commands = commands.len();
+    let unique_commands = commands.iter().collect::<HashSet<_>>().len();
+    let total_words = words.len();
+    let unique_words = words.iter().collect::<HashSet<_>>().len();
+
+    let stats = vec![
         "╔════════════════════════════════════════════╗".to_string(),
         "║               COMMAND PAST                ║".to_string(),
         "╟────────────────────────────────────────────╢".to_string(),
@@ -264,6 +265,37 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
     for line in stats {
         println!("{}", line);
     }
+}
+
+fn print_statistics(commands: &[String], words: &[String], category_counts: &HashMap<String, usize>, matches: &ArgMatches) {
+    if matches.is_present("json") {
+        let result = json!({
+            "commands": commands.len(),
+            "unique_commands": commands.iter().collect::<HashSet<_>>().len(),
+            "words": words.len(),
+            "unique_words": words.iter().collect::<HashSet<_>>().len(),
+            "categories": category_counts
+        });
+        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+        return;
+    }
+
+    if matches.is_present("bare") {
+        print_bare_stats(commands, words, category_counts);
+        return;
+    }
+
+    if matches.is_present("brief") {
+        print_brief_stats(commands, words);
+        return;
+    }
+
+    if matches.is_present("detailed") {
+        print_detailed_analysis(commands, words, category_counts);
+        return;
+    }
+
+    print_boxed_stats(commands, words);
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -283,6 +315,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             .short("j")
             .long("json")
             .help("Output in JSON format"))
+        .arg(Arg::with_name("bare")
+            .short("r")
+            .long("bare")
+            .help("Plain text output without formatting"))
         .arg(Arg::with_name("brief")
             .short("b")
             .long("brief")
@@ -295,7 +331,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .short("q")
             .long("quiet")
             .help("Suppress non-essential output"))
-        .after_help("EXAMPLES:\n  past -b       # Brief summary\n  past -d       # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history")
+        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history")
         .get_matches();
 
     let quiet = matches.is_present("quiet");
