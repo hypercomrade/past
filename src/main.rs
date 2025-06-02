@@ -1,14 +1,53 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::io::Read;
 use std::fs::File;
+use std::io::Read;
 use std::path::Path;
-use std::env;
 use std::process::Command;
+use std::env;
 use regex::Regex;
 use serde_json::json;
 use clap::{Arg, App, ArgMatches, AppSettings};
 use thousands::Separable;
+
+fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<_> = a.chars().collect();
+    let b_chars: Vec<_> = b.chars().collect();
+    let a_len = a_chars.len();
+    let b_len = b_chars.len();
+
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
+
+    let mut matrix = vec![vec![0; b_len + 1]; a_len + 1];
+
+    for i in 1..=a_len {
+        matrix[i][0] = i;
+    }
+
+    for j in 1..=b_len {
+        matrix[0][j] = j;
+    }
+
+    for i in 1..=a_len {
+        for j in 1..=b_len {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            matrix[i][j] = std::cmp::min(
+                matrix[i - 1][j] + 1,
+                std::cmp::min(
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j - 1] + cost
+                )
+            );
+        }
+    }
+
+    matrix[a_len][b_len]
+}
 
 fn get_bash_history() -> Result<String, Box<dyn Error>> {
     let home = env::var("HOME")?;
@@ -172,6 +211,45 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
     let max_length = *cmd_lengths.iter().max().unwrap_or(&0);
     let min_length = *cmd_lengths.iter().min().unwrap_or(&0);
     
+    // Calculate potentially mistyped commands
+    let mut mistyped_count = 0;
+    let command_frequency: HashMap<&String, usize> = commands.iter().fold(HashMap::new(), |mut acc, cmd| {
+        *acc.entry(cmd).or_insert(0) += 1;
+        acc
+    });
+    let unique_command_list: Vec<&String> = command_frequency.keys().copied().collect();
+
+    for cmd in commands {
+        let mut is_mistyped = true;
+        
+        // Check if this is a unique command (only appeared once)
+        if command_frequency.get(cmd).copied().unwrap_or(0) > 1 {
+            continue;
+        }
+
+        // Check against all other commands to see if it's similar to any
+        for other_cmd in &unique_command_list {
+            if cmd == *other_cmd {
+                continue;
+            }
+
+            let distance = levenshtein_distance(cmd, other_cmd);
+            let max_len = std::cmp::max(cmd.len(), other_cmd.len());
+            let similarity_threshold = (max_len as f32 * 0.3).ceil() as usize; // 30% of max length
+
+            if distance <= similarity_threshold {
+                is_mistyped = false;
+                break;
+            }
+        }
+
+        if is_mistyped {
+            mistyped_count += 1;
+        }
+    }
+
+    let mistyped_percentage = (mistyped_count as f64 / total_commands as f64) * 100.0;
+    
     let mut word_counts = HashMap::new();
     for word in words {
         *word_counts.entry(word.clone()).or_insert(0) += 1;
@@ -189,6 +267,9 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
     println!("- Unique commands: {} ({:.1}% variety)", 
         unique_commands.separate_with_commas(),
         (unique_commands as f64 / total_commands as f64) * 100.0);
+    println!("- Potentially mistyped: {} ({:.1}%)", 
+        mistyped_count.separate_with_commas(),
+        mistyped_percentage);
     println!("- Total keywords: {}", total_words.separate_with_commas());
     println!("- Unique keywords: {} ({:.1}% variety)",
         unique_words.separate_with_commas(),
