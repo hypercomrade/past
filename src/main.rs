@@ -45,7 +45,7 @@ lazy_static! {
         ("C/C++", vec!["gcc", "g++", "clang", "make ", "cmake", "ninja", "gdb", "lldb", "valgrind", "cpp"]),
         ("C#", vec!["dotnet", "mono", "msbuild", "csc"]),
         ("JavaScript", vec!["node ", "npm ", "yarn", "deno", "tsc", "bun"]),
-        ("Go", vec!["go ", "gofmt", "golangci-lint"]),
+        ("Go", vec![" go ","^go","$go", "gofmt", "golangci-lint"]),
         ("Ruby", vec!["ruby ", "gem ", "rake", "bundle"]),
         ("PHP", vec!["php ", "composer", "phpunit"]),
         ("Shell", vec!["bash ", "sh ", "zsh ", "fish ", "dash", "ksh"]),
