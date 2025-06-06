@@ -9,6 +9,57 @@ use regex::Regex;
 use serde_json::json;
 use clap::{Arg, App, ArgMatches, AppSettings};
 use thousands::Separable;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref NAV_COMMANDS: Vec<&'static str> = vec!["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
+    static ref FILE_OPS: Vec<&'static str> = vec!["cp ", "mv ", "rm ", "mkdir", "touch", "chmod", "chown", "ln ", "rsync", "tar ", 
+                   "gzip", "gunzip", "zip", "unzip", "7z", "rename", "trash", "shred"];
+    static ref EDITORS: Vec<&'static str> = vec!["vim ", "nano ", "emacs", "code ", "subl ", "gedit", "pico", "vi", "micro", "kate", 
+                  "atom", "neovim", "nano", "ed", "sed ", "awk "];
+    static ref VCS: Vec<&'static str> = vec!["git ", "hg ", "svn ", "fossil", "bzr", "cvs", "darcs", "git-lfs", "git-flow"];
+    static ref PACKAGE_MANAGERS: Vec<&'static str> = vec!["apt", "yum", "dnf", "pacman", "brew", "pip ", "npm ", "snap", "flatpak", 
+                           "zypper", "port", "apk", "dpkg", "rpm", "gem", "cargo", "go ", "dotnet"];
+    static ref SYSTEM_MONITORS: Vec<&'static str> = vec!["top", "htop", "ps ", "kill", "df ", "du ", "free", "btop", "glances", "nmon", 
+                         "iotop", "iftop", "nethogs", "vmstat", "iostat", "dstat", "sar", "mpstat", "pidstat"];
+    static ref NETWORK_COMMANDS: Vec<&'static str> = vec!["ssh ", "scp ", "ping", "curl", "wget", "ifconfig", "ip ", "sftp", "ftp", "telnet", 
+                           "netstat", "ss", "traceroute", "tracepath", "mtr", "dig", "nslookup", "nmcli", "iwconfig"];
+    static ref DATABASES: Vec<&'static str> = vec!["mysql", "psql", "sqlite3", "mongo", "redis-cli", "sqlcmd", "clickhouse-client", 
+                    "influx", "cqlsh", "neo4j", "arangosh", "cockroach sql"];
+    static ref CONTAINERS: Vec<&'static str> = vec!["docker ", "podman", "kubectl", "oc ", "ctr", "nerdctl", "lxc", "lxd", "vagrant", 
+                     "virsh", "qemu", "lima", "colima"];
+    static ref SHELL_BUILTINS: Vec<&'static str> = vec!["export", "source", "alias", "echo", "printf", "read", "set", "unset", "type", 
+                         "hash", "history", "fc", "jobs", "bg", "fg", "wait", "times", "trap"];
+    
+    static ref LANGUAGES: Vec<(&'static str, Vec<&'static str>)> = vec![
+        ("Rust", vec![
+            "cargo", "rustc", "rustup", "rustfmt", "clippy", 
+            "cargo build", "cargo run", "cargo test", "cargo check",
+            "cargo clippy", "cargo fmt", "cargo doc", "cargo add",
+            "cargo update", "cargo install", "cargo publish",
+            "cargo tree", "cargo metadata", "cargo audit",
+            "cargo deny", "cargo expand", "cargo vendor"
+        ]),
+        ("Python", vec!["python", "pip", "py ", "python3", "python2", "pylint", "pyflakes", "mypy", "black"]),
+        ("Java", vec!["java ", "javac", "mvn ", "gradle", "ant ", "jbang", "groovy"]),
+        ("C/C++", vec!["gcc", "g++", "clang", "make ", "cmake", "ninja", "gdb", "lldb", "valgrind", "cpp"]),
+        ("C#", vec!["dotnet", "mono", "msbuild", "csc"]),
+        ("JavaScript", vec!["node ", "npm ", "yarn", "deno", "tsc", "bun"]),
+        ("Go", vec!["go ", "gofmt", "golangci-lint"]),
+        ("Ruby", vec!["ruby ", "gem ", "rake", "bundle"]),
+        ("PHP", vec!["php ", "composer", "phpunit"]),
+        ("Shell", vec!["bash ", "sh ", "zsh ", "fish ", "dash", "ksh"]),
+        ("Assembly", vec!["as ", "nasm", "yasm", "objdump", "gdb"]),
+        ("R", vec!["r ", "rscript", "radian"]),
+        ("Perl", vec!["perl ", "cpan"]),
+        ("Haskell", vec!["ghc", "ghci", "stack", "cabal"]),
+        ("Lua", vec!["lua ", "luac"]),
+        ("Dart", vec!["dart ", "flutter"]),
+        ("Scala", vec!["scala ", "scalac"]),
+        ("Kotlin", vec!["kotlin", "kotlinc"]),
+        ("Swift", vec!["swift ", "swiftc"]),
+    ];
+}
 
 fn levenshtein_distance(a: &str, b: &str) -> usize {
     let a_chars: Vec<_> = a.chars().collect();
@@ -123,67 +174,53 @@ fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
     (commands, words)
 }
 
-fn categorize_command(cmd: &str) -> String {
+fn categorize_command(cmd: &str) -> Vec<String> {
     let cmd_lower = cmd.to_lowercase();
-    let nav_commands = ["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
-    let file_ops = ["cp ", "mv ", "rm ", "mkdir", "touch", "chmod", "chown", "ln ", "rsync", "tar ", 
-                   "gzip", "gunzip", "zip", "unzip", "7z", "rename", "trash", "shred"];
-    let editors = ["vim ", "nano ", "emacs", "code ", "subl ", "gedit", "pico", "vi", "micro", "kate", 
-                  "atom", "neovim", "nano", "ed", "sed ", "awk "];
-    let vcs = ["git ", "hg ", "svn ", "fossil", "bzr", "cvs", "darcs", "git-lfs", "git-flow"];
-    let package_managers = ["apt", "yum", "dnf", "pacman", "brew", "pip ", "npm ", "snap", "flatpak", 
-                           "zypper", "port", "apk", "dpkg", "rpm", "gem", "cargo", "go ", "dotnet"];
-    let system_monitors = ["top", "htop", "ps ", "kill", "df ", "du ", "free", "btop", "glances", "nmon", 
-                         "iotop", "iftop", "nethogs", "vmstat", "iostat", "dstat", "sar", "mpstat", "pidstat"];
-    let network_commands = ["ssh ", "scp ", "ping", "curl", "wget", "ifconfig", "ip ", "sftp", "ftp", "telnet", 
-                           "netstat", "ss", "traceroute", "tracepath", "mtr", "dig", "nslookup", "nmcli", "iwconfig"];
-    let databases = ["mysql", "psql", "sqlite3", "mongo", "redis-cli", "sqlcmd", "clickhouse-client", 
-                    "influx", "cqlsh", "neo4j", "arangosh", "cockroach sql"];
-    let containers = ["docker ", "podman", "kubectl", "oc ", "ctr", "nerdctl", "lxc", "lxd", "vagrant", 
-                     "virsh", "qemu", "lima", "colima"];
-    let shell_builtins = ["export", "source", "alias", "echo", "printf", "read", "set", "unset", "type", 
-                         "hash", "history", "fc", "jobs", "bg", "fg", "wait", "times", "trap"];
+    let mut categories = Vec::new();
 
-    if nav_commands.iter().any(|&x| cmd_lower.contains(x)) { return "Navigation".to_string(); }
-    if file_ops.iter().any(|&x| cmd_lower.contains(x)) { return "File Ops".to_string(); }
-    if editors.iter().any(|&x| cmd_lower.contains(x)) { return "Editors".to_string(); }
-    if vcs.iter().any(|&x| cmd_lower.contains(x)) { return "Version Ctrl".to_string(); }
-    if package_managers.iter().any(|&x| cmd_lower.contains(x)) { return "Pkg Mgmt".to_string(); }
-    if system_monitors.iter().any(|&x| cmd_lower.contains(x)) { return "Sys Monitor".to_string(); }
-    if network_commands.iter().any(|&x| cmd_lower.contains(x)) { return "Network".to_string(); }
-    if databases.iter().any(|&x| cmd_lower.contains(x)) { return "Databases".to_string(); }
-    if containers.iter().any(|&x| cmd_lower.contains(x)) { return "Containers".to_string(); }
-    if shell_builtins.iter().any(|&x| cmd_lower.contains(x)) { return "Shell Builtins".to_string(); }
+    if NAV_COMMANDS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Navigation".to_string());
+    }
+    if FILE_OPS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("File Ops".to_string());
+    }
+    if EDITORS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Editors".to_string());
+    }
+    if VCS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Version Ctrl".to_string());
+    }
+    if PACKAGE_MANAGERS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Pkg Mgmt".to_string());
+    }
+    if SYSTEM_MONITORS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Sys Monitor".to_string());
+    }
+    if NETWORK_COMMANDS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Network".to_string());
+    }
+    if DATABASES.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Databases".to_string());
+    }
+    if CONTAINERS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Containers".to_string());
+    }
+    if SHELL_BUILTINS.iter().any(|&x| cmd_lower.contains(x)) {
+        categories.push("Shell Builtins".to_string());
+    }
 
-    let languages: HashMap<&str, Vec<&str>> = [
-        ("Python", vec!["python", "pip", "py ", "python3", "python2", "pylint", "pyflakes", "mypy", "black"]),
-        ("Java", vec!["java ", "javac", "mvn ", "gradle", "ant ", "jbang", "groovy"]),
-        ("Rust", vec!["rustc", "cargo", "rustup", "rustfmt", "clippy"]),
-        ("C/C++", vec!["gcc", "g++", "clang", "make ", "cmake", "ninja", "gdb", "lldb", "valgrind", "cpp"]),
-        ("C#", vec!["dotnet", "mono", "msbuild", "csc"]),
-        ("JavaScript", vec!["node ", "npm ", "yarn", "deno", "tsc", "bun"]),
-        ("Go", vec!["go ", "gofmt", "golangci-lint"]),
-        ("Ruby", vec!["ruby ", "gem ", "rake", "bundle"]),
-        ("PHP", vec!["php ", "composer", "phpunit"]),
-        ("Shell", vec!["bash ", "sh ", "zsh ", "fish ", "dash", "ksh"]),
-        ("Assembly", vec!["as ", "nasm", "yasm", "objdump", "gdb"]),
-        ("R", vec!["r ", "rscript", "radian"]),
-        ("Perl", vec!["perl ", "cpan"]),
-        ("Haskell", vec!["ghc", "ghci", "stack", "cabal"]),
-        ("Lua", vec!["lua ", "luac"]),
-        ("Dart", vec!["dart ", "flutter"]),
-        ("Scala", vec!["scala ", "scalac"]),
-        ("Kotlin", vec!["kotlin", "kotlinc"]),
-        ("Swift", vec!["swift ", "swiftc"]),
-    ].iter().cloned().collect();
-
-    for (lang, keywords) in languages {
+    // Language checks
+    for (lang, keywords) in LANGUAGES.iter() {
         if keywords.iter().any(|&x| cmd_lower.contains(x)) {
-            return format!("Lang: {}", lang);
+            categories.push(format!("Lang: {}", lang));
         }
     }
 
-    "Other".to_string()
+    if categories.is_empty() {
+        categories.push("Other".to_string());
+    }
+    
+    categories
 }
 
 fn print_brief_stats(commands: &[String], words: &[String]) {
@@ -222,12 +259,10 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
     for cmd in commands {
         let mut is_mistyped = true;
         
-        // Check if this is a unique command (only appeared once)
         if command_frequency.get(cmd).copied().unwrap_or(0) > 1 {
             continue;
         }
 
-        // Check against all other commands to see if it's similar to any
         for other_cmd in &unique_command_list {
             if cmd == *other_cmd {
                 continue;
@@ -235,7 +270,7 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
 
             let distance = levenshtein_distance(cmd, other_cmd);
             let max_len = std::cmp::max(cmd.len(), other_cmd.len());
-            let similarity_threshold = (max_len as f32 * 0.3).ceil() as usize; // 30% of max length
+            let similarity_threshold = (max_len as f32 * 0.3).ceil() as usize;
 
             if distance <= similarity_threshold {
                 is_mistyped = false;
@@ -451,8 +486,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut category_counts = HashMap::new();
     for cmd in &commands {
-        let category = categorize_command(cmd);
-        *category_counts.entry(category).or_insert(0) += 1;
+        for category in categorize_command(cmd) {
+            *category_counts.entry(category).or_insert(0) += 1;
+        }
     }
 
     print_statistics(&commands, &words, &category_counts, &matches);
