@@ -418,7 +418,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("past")
         .version("0.1")
         .author("Mikhail Ukrainetz <mckaylbing@gmail.com>")
-        .about("The history analysis command for Unix")
+        .about("The history analysis command for Unix-like systems")
         .setting(AppSettings::ArgRequiredElseHelp)
         .setting(AppSettings::ColoredHelp)
         .arg(Arg::with_name("file")
