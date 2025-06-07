@@ -61,7 +61,7 @@ lazy_static! {
     ];
 }
 
-fn levenshtein_distance(a: &str, b: &str) -> usize {
+fn optimized_levenshtein(a: &str, b: &str) -> usize {
     let a_chars: Vec<_> = a.chars().collect();
     let b_chars: Vec<_> = b.chars().collect();
     let a_len = a_chars.len();
@@ -74,30 +74,84 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
         return a_len;
     }
 
-    let mut matrix = vec![vec![0; b_len + 1]; a_len + 1];
-
-    for i in 1..=a_len {
-        matrix[i][0] = i;
+    // End if lengths are very different //
+    let length_diff = a_len.abs_diff(b_len);
+    if length_diff > 5 {
+        return length_diff;
     }
 
-    for j in 1..=b_len {
-        matrix[0][j] = j;
-    }
+    let mut prev_row: Vec<usize> = (0..=b_len).collect();
+    let mut curr_row = vec![0; b_len + 1];
 
     for i in 1..=a_len {
+        curr_row[0] = i;
+        let mut min_in_row = i;
+
         for j in 1..=b_len {
             let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
-            matrix[i][j] = std::cmp::min(
-                matrix[i - 1][j] + 1,
+            curr_row[j] = std::cmp::min(
+                curr_row[j - 1] + 1,
                 std::cmp::min(
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j - 1] + cost
+                    prev_row[j] + 1,
+                    prev_row[j - 1] + cost
                 )
             );
+            min_in_row = std::cmp::min(min_in_row, curr_row[j]);
+        }
+
+        // End if minimum in row exceeds threshold //
+        let max_len = std::cmp::max(a_len, b_len);
+        let threshold = (max_len as f32 * 0.3).ceil() as usize;
+        if min_in_row > threshold {
+            return min_in_row;
+        }
+
+        std::mem::swap(&mut prev_row, &mut curr_row);
+    }
+
+    prev_row[b_len]
+}
+
+fn find_potential_mistypes(commands: &[String], command_frequency: &HashMap<&String, usize>) -> usize {
+    let unique_commands: Vec<&String> = command_frequency.keys().copied().collect();
+    let mut mistyped_count = 0;
+
+    for cmd in commands {
+        // Skip commands that appear multiple times //
+        if command_frequency.get(cmd).copied().unwrap_or(0) > 1 {
+            continue;
+        }
+
+        let mut is_mistyped = true;
+        let cmd_len = cmd.len();
+
+        for other_cmd in &unique_commands {
+            if cmd == *other_cmd {
+                continue;
+            }
+
+            let other_len = other_cmd.len();
+            // Skip if lengths are too different (could be adjusted later if this seems too strict) //
+            if cmd_len.abs_diff(other_len) > 5 {
+                continue;
+            }
+
+            let distance = optimized_levenshtein(cmd, other_cmd);
+            let max_len = std::cmp::max(cmd_len, other_len);
+            let similarity_threshold = (max_len as f32 * 0.3).ceil() as usize;
+
+            if distance <= similarity_threshold {
+                is_mistyped = false;
+                break;
+            }
+        }
+
+        if is_mistyped {
+            mistyped_count += 1;
         }
     }
 
-    matrix[a_len][b_len]
+    mistyped_count
 }
 
 fn get_bash_history() -> Result<String, Box<dyn Error>> {
@@ -209,7 +263,7 @@ fn categorize_command(cmd: &str) -> Vec<String> {
         categories.push("Shell Builtins".to_string());
     }
 
-    // Language checks
+    // Language checks (should be expanded)
     for (lang, keywords) in LANGUAGES.iter() {
         if keywords.iter().any(|&x| cmd_lower.contains(x)) {
             categories.push(format!("Lang: {}", lang));
@@ -248,41 +302,12 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
     let max_length = *cmd_lengths.iter().max().unwrap_or(&0);
     let min_length = *cmd_lengths.iter().min().unwrap_or(&0);
     
-    // Calculate potentially mistyped commands
-    let mut mistyped_count = 0;
+    // Find potentially mistyped commands //
     let command_frequency: HashMap<&String, usize> = commands.iter().fold(HashMap::new(), |mut acc, cmd| {
         *acc.entry(cmd).or_insert(0) += 1;
         acc
     });
-    let unique_command_list: Vec<&String> = command_frequency.keys().copied().collect();
-
-    for cmd in commands {
-        let mut is_mistyped = true;
-        
-        if command_frequency.get(cmd).copied().unwrap_or(0) > 1 {
-            continue;
-        }
-
-        for other_cmd in &unique_command_list {
-            if cmd == *other_cmd {
-                continue;
-            }
-
-            let distance = levenshtein_distance(cmd, other_cmd);
-            let max_len = std::cmp::max(cmd.len(), other_cmd.len());
-            let similarity_threshold = (max_len as f32 * 0.3).ceil() as usize;
-
-            if distance <= similarity_threshold {
-                is_mistyped = false;
-                break;
-            }
-        }
-
-        if is_mistyped {
-            mistyped_count += 1;
-        }
-    }
-
+    let mistyped_count = find_potential_mistypes(commands, &command_frequency);
     let mistyped_percentage = (mistyped_count as f64 / total_commands as f64) * 100.0;
     
     let mut word_counts = HashMap::new();
