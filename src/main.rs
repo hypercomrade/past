@@ -40,9 +40,9 @@ lazy_static! {
             "cargo tree", "cargo metadata", "cargo audit",
             "cargo deny", "cargo expand", "cargo vendor"
         ]),
-        ("Python", vec!["python", "pip", "py ", "python3", "python2", "pylint", "pyflakes", "mypy", "black"]),
+        ("Python", vec!["python", "pip", "py ", "python3", "python2", "pylint", "pyflakes", "mypy", "black", "snakemake"]),
         ("Java", vec!["java ", "javac", "mvn ", "gradle", "ant ", "jbang", "groovy"]),
-        ("C/C++", vec!["gcc", "g++", "clang", "make ", "cmake", "ninja", "gdb", "lldb", "valgrind", "cpp"]),
+        ("C/C++", vec!["gcc", "g++", "clang", "^make ","$make", "cmake", "ninja", "gdb", "lldb", "valgrind", "cpp"]),
         ("C#", vec!["dotnet", "mono", "msbuild", "csc"]),
         ("JavaScript", vec!["node ", "npm ", "yarn", "deno", "tsc", "bun"]),
         ("Go", vec![" go ","^go","$go", "gofmt", "golangci-lint"]),
