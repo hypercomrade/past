@@ -2,7 +2,7 @@
 
 The history analysis command for Unix-like shells (sorry powershell fans).
 
-The goal of past is so be sort a history+ command. Allowing you to see usage patterns, trends, and generally look back on your
+The goal of past is so be a history+ command. Allowing you to see usage patterns, trends, and generally look back on your
 command history in a more modern way.
 
 ### **Supported Shells**
