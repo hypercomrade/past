@@ -1,3 +1,10 @@
+name: Cross-platform Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -7,8 +14,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    # Install Rust (hopefully) #
     - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
     
+    # Install specific cross-compilation tools #
     - name: Install ARM toolchain
       if: matrix.target == 'aarch64-unknown-linux-gnu'
       run: |
@@ -17,7 +28,7 @@ jobs:
           gcc-aarch64-linux-gnu \
           g++-aarch64-linux-gnu \
           libc6-dev-arm64-cross
-        
+    
     - name: Install x86 toolchain
       if: matrix.target == 'x86_64-unknown-linux-gnu'
       run: |
@@ -26,8 +37,8 @@ jobs:
           gcc-x86-64-linux-gnu \
           g++-x86-64-linux-gnu
     
+    # environment variable specifically for ARM #
     - name: Build
       env:
-        # Set linker for ARM target
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
       run: cargo build --target ${{ matrix.target }} --release
