@@ -30,11 +30,11 @@ jobs:
                 libc6-dev-arm64-cross
           
           # macOS targets
-          - os: macos-12
+          - os: macos-latest
             target: x86_64-apple-darwin
             linker:
             install_cmd:
-          - os: macos-12
+          - os: macos-latest
             target: aarch64-apple-darwin
             linker:
             install_cmd:
