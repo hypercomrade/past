@@ -14,3 +14,20 @@ command history in a more modern way.
 ![Debian ARM64](https://img.shields.io/badge/Debian-ARM64-red?logo=debian)
 ![macOS Intel](https://img.shields.io/badge/macOS-x86__64-black?logo=apple)
 ![macOS ARM](https://img.shields.io/badge/macOS-ARM64-black?logo=apple)
+
+### **Contributing**
+If you would like to contribute to this project, download rust (via cargo or brew) clone this repository as shown below
+
+```
+git clone https://github.com/KaylBing/past 
+```
+
+Then, move into the directory and build youre files
+```
+cargo build --release
+```
+
+Lastly, move into the target release directory, and run the past commmand
+```
+./past --help
+```
