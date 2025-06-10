@@ -11,6 +11,8 @@ jobs:
     strategy:
       matrix:
         target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
+      fail-fast: false  # Continue testing other targets if one fails
+    
     steps:
     - uses: actions/checkout@v4
     
