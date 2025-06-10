@@ -1,0 +1,31 @@
+name: Cross-platform Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
+    steps:
+    - uses: actions/checkout@v4  # Updated to v4
+    
+    # Install Rust using the official action (more reliable than actions-rs)
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    # Install cross-compilation dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-x86-64-linux-gnu gcc-aarch64-linux-gnu
+    
+    - name: Build
+      run: cargo build --target ${{ matrix.target }} --release
+    
+    - uses: actions/upload-artifact@v4  # Updated to v4
+      with:
+        name: binary-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/my_cross_platform_app
