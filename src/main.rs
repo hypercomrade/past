@@ -156,9 +156,20 @@ fn find_potential_mistypes(commands: &[String], command_frequency: &HashMap<&Str
 
 fn get_bash_history() -> Result<String, Box<dyn Error>> {
     let home = env::var("HOME")?;
-    let history_path = Path::new(&home).join(".bash_history");
     
-    if let Ok(mut file) = File::open(&history_path) {
+    // Try Zsh history first
+    let zsh_history_path = Path::new(&home).join(".zsh_history");
+    if let Ok(mut file) = File::open(&zsh_history_path) {
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        if !contents.is_empty() {
+            return Ok(contents);
+        }
+    }
+    
+    // Fall back to Bash history
+    let bash_history_path = Path::new(&home).join(".bash_history");
+    if let Ok(mut file) = File::open(&bash_history_path) {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         if !contents.is_empty() {
@@ -166,6 +177,7 @@ fn get_bash_history() -> Result<String, Box<dyn Error>> {
         }
     }
 
+    // Final fallback to live history
     match Command::new("bash")
         .arg("-i")
         .arg("-c")
@@ -174,12 +186,7 @@ fn get_bash_history() -> Result<String, Box<dyn Error>> {
         Ok(output) if output.status.success() => {
             Ok(String::from_utf8(output.stdout)?)
         },
-        _ => {
-            let mut file = File::open(&history_path)?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents)?;
-            Ok(contents)
-        }
+        _ => Err("Could not retrieve shell history".into())
     }
 }
 
