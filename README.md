@@ -9,7 +9,7 @@ command history in a more modern way.
 ![Bash](https://img.shields.io/badge/Shell-Bash-green?logo=gnu-bash)
 ![Zsh](https://img.shields.io/badge/Shell-Zsh-blue?logo=zsh)
 
-### **Supported Architectures**
+### **Supported Systems**
 ![Debian x86_64](https://img.shields.io/badge/Debian-x86__64-red?logo=debian)
 ![Debian ARM64](https://img.shields.io/badge/Debian-ARM64-red?logo=debian)
 ![macOS Intel](https://img.shields.io/badge/macOS-x86__64-black?logo=apple)
