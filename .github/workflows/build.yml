@@ -7,40 +7,56 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
-      fail-fast: false  # Continue testing other targets if one fails
+        include:
+          # Linux targets
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            linker: 
+            install_cmd: |
+              sudo apt-get update
+              sudo apt-get install -y \
+                gcc-x86-64-linux-gnu \
+                g++-x86-64-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            linker: aarch64-linux-gnu-gcc
+            install_cmd: |
+              sudo apt-get update
+              sudo apt-get install -y \
+                gcc-aarch64-linux-gnu \
+                g++-aarch64-linux-gnu \
+                libc6-dev-arm64-cross
+          
+          # macOS targets
+          - os: macos-12
+            target: x86_64-apple-darwin
+            linker:
+            install_cmd:
+          - os: macos-12
+            target: aarch64-apple-darwin
+            linker:
+            install_cmd:
+      fail-fast: false
+    
+    runs-on: ${{ matrix.os }}
     
     steps:
     - uses: actions/checkout@v4
     
-    # Install Rust (hopefully) #
+    # Install Rust
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
     
-    # Install specific cross-compilation tools #
-    - name: Install ARM toolchain
-      if: matrix.target == 'aarch64-unknown-linux-gnu'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          gcc-aarch64-linux-gnu \
-          g++-aarch64-linux-gnu \
-          libc6-dev-arm64-cross
+    # Install toolchain if needed (only for Linux cross-compilation)
+    - name: Install toolchain
+      if: matrix.install_cmd != ''
+      run: ${{ matrix.install_cmd }}
     
-    - name: Install x86 toolchain
-      if: matrix.target == 'x86_64-unknown-linux-gnu'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          gcc-x86-64-linux-gnu \
-          g++-x86-64-linux-gnu
-    
-    # environment variable specifically for ARM #
+    # Build with appropriate linker if specified
     - name: Build
       env:
-        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
       run: cargo build --target ${{ matrix.target }} --release
