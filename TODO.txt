@@ -1,0 +1,11 @@
+Change words so that they each have $ and down carrot
+
+Make history analysis not n^2
+
+Add color output flag
+
+zsh and fish compatable (zsh done)
+
+bash, zsh, and fish runners for x86 and ARM (build --release runners done, no testing yet)
+
+Add search command for each category and for certain keyworks etc
