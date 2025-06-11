@@ -4,7 +4,7 @@
 
 The goal of `past` is to be modern take on the `history` command - allowing you to see usage patterns, trends, and generally look back on your command history in a more modern way. Currently features include:
 
-- Summary statistics of your command usage
+- Summary statistics of your command usage (`--brief or --detailed`)
 - Category-based search (`-C/--category`)
 - Keyword search (`-s/--search`)
 - Interactive search mode (`-i/--interactive`)
