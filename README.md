@@ -7,7 +7,7 @@ The goal of `past` is to be modern take on the `history` command - allowing you 
 - Summary statistics of your command usage
 - Category-based search (`-C/--category`)
 - Keyword search (`-s/--search`)
-- Interactive search mode (`-i/-interactive`)
+- Interactive search mode (`-i/--interactive`)
 
 ### **Supported Shells**
 ![Bash](https://img.shields.io/badge/Shell-Bash-green?logo=gnu-bash)

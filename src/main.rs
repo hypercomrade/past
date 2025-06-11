@@ -20,6 +20,8 @@ use search::{
     print_keyword_search_results, print_category_search_results
 };
 
+// Welcome to my shitty code :)
+
 lazy_static! {
     static ref NAV_COMMANDS: Vec<&'static str> = vec!["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
     static ref FILE_OPS: Vec<&'static str> = vec!["cp ", "mv ", "rm ", "mkdir", "touch", "chmod", "chown", "ln ", "rsync", "tar ", 
