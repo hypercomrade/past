@@ -3,3 +3,6 @@ Change words so that they each have $ and down carrot
 Make history analysis not n^2
 
 zsh and fish compatable (zsh done)
+
+change -i to only display last twenty unique commands
+

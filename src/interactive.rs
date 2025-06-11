@@ -29,7 +29,7 @@ pub fn interactive_search(commands: &[String]) -> Option<String> {
             .collect();
 
         // Limit to 10 most recent matches
-        let display_commands = filtered_commands.iter().take(10).collect::<Vec<_>>();
+        let display_commands = filtered_commands.iter().take(20).collect::<Vec<_>>();
 
         // Draw a bad UI
         terminal.draw(|f| {
