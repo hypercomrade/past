@@ -2,11 +2,12 @@
 
 **The history analysis command for Unix-like shells** (sorry PowerShell fans).
 
-The goal of `past` is to be a better `history` command - allowing you to see usage patterns, trends, and generally look back on your command history in a more modern way. Currently features include:
+The goal of `past` is to be modern take on the `history` command - allowing you to see usage patterns, trends, and generally look back on your command history in a more modern way. Currently features include:
 
 - Summary statistics of your command usage
 - Category-based search (`-C/--category`)
 - Keyword search (`-s/--search`)
+- Interactive search mode (`-i/-interactive`)
 
 ### **Supported Shells**
 ![Bash](https://img.shields.io/badge/Shell-Bash-green?logo=gnu-bash)
@@ -30,6 +31,4 @@ cargo build --release
 
 # Basic usage
 ./target/release/past -d  # Detailed analysis
-./target/release/past -s "git"  # Search for git commands
-./target/release/past -C "Lang"  # Find language-related commands.
 
