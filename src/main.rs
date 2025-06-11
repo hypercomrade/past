@@ -11,6 +11,12 @@ use clap::{Arg, App, ArgMatches, AppSettings};
 use thousands::Separable;
 use lazy_static::lazy_static;
 
+mod search;
+use search::{
+    search_commands_by_keyword, search_words_by_keyword, search_by_category,
+    print_keyword_search_results, print_category_search_results
+};
+
 lazy_static! {
     static ref NAV_COMMANDS: Vec<&'static str> = vec!["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
     static ref FILE_OPS: Vec<&'static str> = vec!["cp ", "mv ", "rm ", "mkdir", "touch", "chmod", "chown", "ln ", "rsync", "tar ", 
@@ -479,7 +485,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             .short("q")
             .long("quiet")
             .help("Suppress non-essential output"))
-        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history")
+        .arg(Arg::with_name("search")
+            .short("s")
+            .long("search")
+            .value_name("PATTERN")
+            .help("Search for commands/keywords containing PATTERN")
+            .takes_value(true)
+            .conflicts_with("category"))
+        .arg(Arg::with_name("category")
+            .short("C")
+            .long("category")
+            .value_name("CATEGORY_PATTERN")
+            .help("Search for commands in categories matching PATTERN")
+            .takes_value(true)
+            .conflicts_with("search"))
+        .arg(Arg::with_name("case-sensitive")
+            .short("c")
+            .long("case-sensitive")
+            .help("Case-sensitive search (only works with -s or -C)"))
+        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history\n  past -s \"git\"  # Search for \"git\" in commands\n  past -C \"Lang\" # Search for language-related commands")
         .get_matches();
 
     let quiet = matches.is_present("quiet");
@@ -524,6 +548,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     print_statistics(&commands, &words, &category_counts, &matches);
+
+    // Handle search operations
+    let case_sensitive = matches.is_present("case-sensitive");
+    
+    if let Some(pattern) = matches.value_of("search") {
+        let matching_commands = search_commands_by_keyword(&commands, pattern, case_sensitive);
+        let matching_words = search_words_by_keyword(&words, pattern, case_sensitive);
+        print_keyword_search_results(&matching_commands, &matching_words);
+    } else if let Some(category_pattern) = matches.value_of("category") {
+        let (matching_commands, matching_categories) = search_by_category(
+            &commands,
+            category_pattern,
+            case_sensitive,
+            &category_counts
+        );
+        print_category_search_results(&matching_commands, &matching_categories);
+    }
 
     Ok(())
 }
