@@ -10,3 +10,6 @@ serde_json = "1.0"
 term = "0.7"
 thousands = "0.2"
 lazy_static = "1.4.0"
+termion = "2.0"
+tui = { version = "0.19", default-features = false, features = ["termion"] }
+crossterm = { version = "0.27", features = ["event-stream"] }

@@ -11,6 +11,9 @@ use clap::{Arg, App, ArgMatches, AppSettings};
 use thousands::Separable;
 use lazy_static::lazy_static;
 
+mod interactive;
+use interactive::interactive_search;
+
 mod search;
 use search::{
     search_commands_by_keyword, search_words_by_keyword, search_by_category,
@@ -80,7 +83,6 @@ fn optimized_levenshtein(a: &str, b: &str) -> usize {
         return a_len;
     }
 
-    // End if lengths are very different //
     let length_diff = a_len.abs_diff(b_len);
     if length_diff > 5 {
         return length_diff;
@@ -105,7 +107,6 @@ fn optimized_levenshtein(a: &str, b: &str) -> usize {
             min_in_row = std::cmp::min(min_in_row, curr_row[j]);
         }
 
-        // End if minimum in row exceeds threshold //
         let max_len = std::cmp::max(a_len, b_len);
         let threshold = (max_len as f32 * 0.3).ceil() as usize;
         if min_in_row > threshold {
@@ -123,7 +124,6 @@ fn find_potential_mistypes(commands: &[String], command_frequency: &HashMap<&Str
     let mut mistyped_count = 0;
 
     for cmd in commands {
-        // Skip commands that appear multiple times //
         if command_frequency.get(cmd).copied().unwrap_or(0) > 1 {
             continue;
         }
@@ -137,7 +137,6 @@ fn find_potential_mistypes(commands: &[String], command_frequency: &HashMap<&Str
             }
 
             let other_len = other_cmd.len();
-            // Skip if lengths are too different (could be adjusted later if this seems too strict) //
             if cmd_len.abs_diff(other_len) > 5 {
                 continue;
             }
@@ -163,7 +162,6 @@ fn find_potential_mistypes(commands: &[String], command_frequency: &HashMap<&Str
 fn get_bash_history() -> Result<String, Box<dyn Error>> {
     let home = env::var("HOME")?;
     
-    // Try Zsh history first
     let zsh_history_path = Path::new(&home).join(".zsh_history");
     if let Ok(mut file) = File::open(&zsh_history_path) {
         let mut contents = String::new();
@@ -173,7 +171,6 @@ fn get_bash_history() -> Result<String, Box<dyn Error>> {
         }
     }
     
-    // Fall back to Bash history
     let bash_history_path = Path::new(&home).join(".bash_history");
     if let Ok(mut file) = File::open(&bash_history_path) {
         let mut contents = String::new();
@@ -183,7 +180,6 @@ fn get_bash_history() -> Result<String, Box<dyn Error>> {
         }
     }
 
-    // Final fallback to live history
     match Command::new("bash")
         .arg("-i")
         .arg("-c")
@@ -276,7 +272,6 @@ fn categorize_command(cmd: &str) -> Vec<String> {
         categories.push("Shell Builtins".to_string());
     }
 
-    // Language checks (should be expanded)
     for (lang, keywords) in LANGUAGES.iter() {
         if keywords.iter().any(|&x| cmd_lower.contains(x)) {
             categories.push(format!("Lang: {}", lang));
@@ -315,7 +310,6 @@ fn print_detailed_analysis(commands: &[String], words: &[String], category_count
     let max_length = *cmd_lengths.iter().max().unwrap_or(&0);
     let min_length = *cmd_lengths.iter().min().unwrap_or(&0);
     
-    // Find potentially mistyped commands //
     let command_frequency: HashMap<&String, usize> = commands.iter().fold(HashMap::new(), |mut acc, cmd| {
         *acc.entry(cmd).or_insert(0) += 1;
         acc
@@ -503,7 +497,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .short("c")
             .long("case-sensitive")
             .help("Case-sensitive search (only works with -s or -C)"))
-        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history\n  past -s \"git\"  # Search for \"git\" in commands\n  past -C \"Lang\" # Search for language-related commands")
+        .arg(Arg::with_name("interactive")
+            .short("i")
+            .long("interactive")
+            .help("Interactive command search")
+            .conflicts_with_all(&["search", "category"]))
+        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history\n  past -s \"git\"  # Search for \"git\" in commands\n  past -C \"Lang\" # Search for language-related commands\n  past -i      # Interactive search mode")
         .get_matches();
 
     let quiet = matches.is_present("quiet");
@@ -538,6 +537,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     if commands.is_empty() {
         eprintln!("No valid commands found in the history.");
         std::process::exit(1);
+    }
+
+    // Handle interactive search before other operations
+    if matches.is_present("interactive") {
+        if let Some(selected_command) = interactive_search(&commands) {
+            println!("{}", selected_command);
+            return Ok(());
+        }
+        return Ok(());
     }
 
     let mut category_counts = HashMap::new();
