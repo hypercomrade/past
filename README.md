@@ -1,9 +1,12 @@
 ## past
 
-The history analysis command for Unix-like shells (sorry powershell fans).
+**The history analysis command for Unix-like shells** (sorry PowerShell fans).
 
-The goal of past is so be a history+ command. Allowing you to see usage patterns, trends, and generally look back on your
-command history in a more modern way.
+The goal of `past` is to be a better `history` command - allowing you to see usage patterns, trends, and generally look back on your command history in a more modern way. Currently features include:
+
+- Summary statistics of your command usage
+- Category-based search (`-C/--category`)
+- Keyword search (`-s/--search`)
 
 ### **Supported Shells**
 ![Bash](https://img.shields.io/badge/Shell-Bash-green?logo=gnu-bash)
@@ -15,19 +18,18 @@ command history in a more modern way.
 ![macOS Intel](https://img.shields.io/badge/macOS-x86__64-black?logo=apple)
 ![macOS ARM](https://img.shields.io/badge/macOS-ARM64-black?logo=apple)
 
-### **Contributing**
-If you would like to contribute to this project, download rust (via conda, apt or brew) clone this repository as shown below
-
-```
-git clone https://github.com/KaylBing/past 
-```
-
-Then, move into the directory and build youre files
-```
+### **Quick Start**
+```bash
+# Clone and build
+git clone https://github.com/KaylBing/past
+cd past
 cargo build --release
-```
 
-Lastly, move into the target/release directory, and run the past commmand
-```
-./past --help
-```
+# Run with help
+./target/release/past --help
+
+# Basic usage
+./target/release/past -d  # Detailed analysis
+./target/release/past -s "git"  # Search for git commands
+./target/release/past -C "Lang"  # Find language-related commands.
+
