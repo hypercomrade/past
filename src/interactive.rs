@@ -18,20 +18,28 @@ pub fn interactive_search(commands: &[String]) -> Option<String> {
     // Initial state
     let mut input = String::new();
     let mut selected = 0;
-    let mut filtered_commands: Vec<&String> = commands.iter().rev().collect();
+    
+    // Create a vector of unique commands in reverse order (most recent first)
+    let mut unique_commands = Vec::new();
+    for cmd in commands.iter().rev() {
+        if !unique_commands.iter().any(|x| *x == cmd) {
+            unique_commands.push(cmd);
+        }
+    }
+    let mut filtered_commands: Vec<&String> = unique_commands.clone();
 
     loop {
         // Filter commands based on input
-        filtered_commands = commands
+        filtered_commands = unique_commands
             .iter()
-            .rev()
             .filter(|cmd| cmd.to_lowercase().contains(&input.to_lowercase()))
+            .copied()
             .collect();
 
-        // Limit to 10 most recent matches
+        // Limit to 20 most recent matches
         let display_commands = filtered_commands.iter().take(20).collect::<Vec<_>>();
 
-        // Draw a bad UI
+        // Draw the UI
         terminal.draw(|f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
