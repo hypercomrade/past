@@ -1,4 +1,4 @@
-name: Cross-platform Build and Shell Testing
+name: Cross-platform Shell Testing
 
 on:
   push:
@@ -6,38 +6,38 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     strategy:
       matrix:
         include:
           # Linux targets
-          - os: ubuntu-latest
+          - platform: linux-x64
+            os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            linker: 
-            install_cmd: |
-              sudo apt-get update
-              sudo apt-get install -y \
-                gcc-x86-64-linux-gnu \
-                g++-x86-64-linux-gnu
-          - os: ubuntu-latest
+            shell: [bash, zsh, fish, ksh]
+          
+          - platform: linux-arm64
+            os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            linker: aarch64-linux-gnu-gcc
-            install_cmd: |
+            shell: [bash, zsh, fish, ksh]
+            setup: |
               sudo apt-get update
               sudo apt-get install -y \
                 gcc-aarch64-linux-gnu \
                 g++-aarch64-linux-gnu \
                 libc6-dev-arm64-cross
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
           
           # macOS targets
-          - os: macos-latest
+          - platform: macos-x64
+            os: macos-latest
             target: x86_64-apple-darwin
-            linker:
-            install_cmd:
-          - os: macos-latest
+            shell: [bash, zsh, fish]
+          
+          - platform: macos-arm64
+            os: macos-latest
             target: aarch64-apple-darwin
-            linker:
-            install_cmd:
+            shell: [bash, zsh, fish]
       fail-fast: false
     
     runs-on: ${{ matrix.os }}
@@ -45,56 +45,46 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    # Install Rust
+    # Install Rust and target
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
     
-    # Install toolchain if needed (only for Linux cross-compilation)
-    - name: Install toolchain
-      if: matrix.install_cmd != ''
-      run: ${{ matrix.install_cmd }}
+    # Setup cross-compilation if needed
+    - name: Setup cross-compilation
+      if: matrix.setup
+      run: ${{ matrix.setup }}
     
-    # Build with appropriate linker if specified
-    - name: Build
-      env:
-        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
-      run: cargo build --target ${{ matrix.target }} --release
-
-  shell-tests:
-    needs: build
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        shell: [bash, zsh, fish, ksh]
-    steps:
-    - uses: actions/checkout@v4
-    
-    # Install Rust
-    - uses: dtolnay/rust-toolchain@stable
-    
-    # Install the shell being tested
+    # Install shell being tested
     - name: Install shell
       run: |
-        sudo apt-get update
-        case "${{ matrix.shell }}" in
-          bash|zsh)
-            sudo apt-get install -y ${{ matrix.shell }} ;;
-          fish)
-            sudo apt-get install -y fish ;;
-          ksh)
-            sudo apt-get install -y ksh ;;
-        esac
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          sudo apt-get update
+          case "${{ matrix.shell }}" in
+            bash|zsh)
+              sudo apt-get install -y ${{ matrix.shell }} ;;
+            fish)
+              sudo apt-get install -y fish ;;
+            ksh)
+              sudo apt-get install -y ksh ;;
+          esac
+        else  # macOS
+          case "${{ matrix.shell }}" in
+            fish)
+              brew install fish ;;
+          esac
+        fi
     
     # Build the project
     - name: Build
-      run: cargo build --release
+      run: cargo build --target ${{ matrix.target }} --release
     
     # Create test history file
     - name: Setup test history
       run: |
         mkdir -p ~/.local/share/fish  # For fish history
         echo "echo 'test command'" > test_history
+        
         case "${{ matrix.shell }}" in
           fish)
             echo "- cmd: echo 'test command'" > ~/.local/share/fish/fish_history ;;
@@ -106,14 +96,13 @@ jobs:
             cp test_history ~/.zsh_history ;;
         esac
     
-    # Run tests for the specific shell
-    - name: Test with ${{ matrix.shell }}
+    # Run tests
+    - name: Test with ${{ matrix.shell }} on ${{ matrix.platform }}
       run: |
-        # Set the shell for the test
-        echo "Testing with ${{ matrix.shell }}"
-        ./target/release/past --brief
-        ./target/release/past -s "test"
+        echo "Testing ${{ matrix.shell }} on ${{ matrix.platform }}"
+        ./target/${{ matrix.target }}/release/past --brief
+        ./target/${{ matrix.target }}/release/past -s "test"
         
-        # Verify the shell was detected correctly
-        ./target/release/past --brief | grep -q "Commands: 1" || (echo "Command count mismatch" && exit 1)
-        ./target/release/past -s "test" | grep -q "test command" || (echo "Search failed" && exit 1)
+        # Verify basic functionality
+        ./target/${{ matrix.target }}/release/past --brief | grep -q "Commands: 1" || (echo "Command count mismatch" && exit 1)
+        ./target/${{ matrix.target }}/release/past -s "test" | grep -q "test command" || (echo "Search failed" && exit 1)
