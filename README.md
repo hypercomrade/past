@@ -12,6 +12,8 @@ The goal of `past` is to be modern take on the `history` command - allowing you 
 ### **Supported Shells**
 ![Bash](https://img.shields.io/badge/Shell-Bash-green?logo=gnu-bash)
 ![Zsh](https://img.shields.io/badge/Shell-Zsh-blue?logo=zsh)
+![Fish](https://img.shields.io/badge/Shell-Fish-yellow?logo=fish)
+![Ksh](https://img.shields.io/badge/Shell-Ksh-lightgrey?logo=terminal)
 
 ### **Supported Systems**
 ![Debian x86_64](https://img.shields.io/badge/Debian-x86__64-red?logo=debian)
@@ -26,9 +28,7 @@ git clone https://github.com/KaylBing/past
 cd past
 cargo build --release
 
-# Run with help
-./target/release/past --help
+# Aliasing (until we are approved for brew and apt)
+# The cleanest way to use our command for now, is to add something like this to you .bashrc
 
-# Basic usage
-./target/release/past -d  # Detailed analysis
-
+alias past='/path/to/repo/past/target/release/past'
