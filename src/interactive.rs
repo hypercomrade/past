@@ -36,8 +36,8 @@ pub fn interactive_search(commands: &[String]) -> Option<String> {
             .copied()
             .collect();
 
-        // Limit to 20 most recent matches
-        let display_commands = filtered_commands.iter().take(20).collect::<Vec<_>>();
+        // Limit to 30 most recent matches
+        let display_commands = filtered_commands.iter().take(30).collect::<Vec<_>>();
 
         // Draw the UI
         terminal.draw(|f| {
