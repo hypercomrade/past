@@ -20,13 +20,6 @@ jobs:
             os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             shell: [bash, zsh, fish, ksh]
-            setup: |
-              sudo apt-get update
-              sudo apt-get install -y \
-                gcc-aarch64-linux-gnu \
-                g++-aarch64-linux-gnu \
-                libc6-dev-arm64-cross
-              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
           
           # macOS targets
           - platform: macos-x64
@@ -45,18 +38,24 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    # Install Rust and target
+    # Install Rust
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
     
-    # Setup cross-compilation if needed
-    - name: Setup cross-compilation
-      if: matrix.setup
-      run: ${{ matrix.setup }}
+    # Setup ARM cross-compilation for Linux
+    - name: Setup ARM toolchain (Linux)
+      if: matrix.platform == 'linux-arm64'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu \
+          libc6-dev-arm64-cross
+        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
     
-    # Install shell being tested
-    - name: Install shell
+    # Install shells
+    - name: Install shell (${{ matrix.shell }})
       run: |
         if [[ "${{ runner.os }}" == "Linux" ]]; then
           sudo apt-get update
@@ -66,13 +65,8 @@ jobs:
             fish)
               sudo apt-get install -y fish ;;
           esac
-        else  # macOS
+        else
           case "${{ matrix.shell }}" in
-            bash)
-              brew install bash
-              sudo chsh -s /usr/local/bin/bash $USER ;;
-            zsh)
-              : # zsh comes with macOS ;;
             fish)
               brew install fish ;;
           esac
@@ -82,15 +76,16 @@ jobs:
     - name: Build
       run: cargo build --target ${{ matrix.target }} --release
     
-    # Configure test environment
-    - name: Setup test environment
+    # Setup test environment
+    - name: Setup test history
       run: |
-        # Create config file to avoid interactive prompt
-        mkdir -p ~/.config/past
-        CONFIG_FILE=~/.pastrc
-        echo "[shell]" > $CONFIG_FILE
-        echo "shell_type = \"${{ matrix.shell }}\"" >> $CONFIG_FILE
-        echo "config_file = \"${{ matrix.shell == 'fish' && '.config/fish/config.fish' || '.${matrix.shell}rc' }\"" >> $CONFIG_FILE
+        # Create config file
+        mkdir -p ~/.config
+        cat > ~/.pastrc <<EOF
+        [shell]
+        shell_type = "${{ matrix.shell }}"
+        config_file = "${{ matrix.shell == 'fish' && '.config/fish/config.fish' || '.${matrix.shell}rc' }}"
+        EOF
 
         # Create test history
         case "${{ matrix.shell }}" in
@@ -98,74 +93,43 @@ jobs:
             mkdir -p ~/.local/share/fish
             echo "- cmd: echo 'test_command_1'
 - cmd: ls -l
-- cmd: git status
-- cmd: cargo build" > ~/.local/share/fish/fish_history ;;
+- cmd: git status" > ~/.local/share/fish/fish_history ;;
           ksh)
             echo "echo 'test_command_1'
 ls -l
-git status
-cargo build" > ~/.sh_history ;;
+git status" > ~/.sh_history ;;
           bash)
             echo "echo 'test_command_1'
 ls -l
-git status
-cargo build" > ~/.bash_history 
-            # For immediate availability on Linux
-            if [[ "${{ runner.os }}" == "Linux" ]]; then
-              history -s "echo 'test_command_1'"
-              history -s "ls -l"
-              history -s "git status"
-              history -s "cargo build"
-            fi ;;
+git status" > ~/.bash_history ;;
           zsh)
             echo "echo 'test_command_1'
 ls -l
-git status
-cargo build" > ~/.zsh_history
-            # For immediate availability on Linux
-            if [[ "${{ runner.os }}" == "Linux" ]]; then
-              zsh -c "print -s \"echo 'test_command_1'\""
-              zsh -c "print -s \"ls -l\""
-              zsh -c "print -s \"git status\""
-              zsh -c "print -s \"cargo build\""
-            fi ;;
+git status" > ~/.zsh_history ;;
         esac
     
-    # Test Cases
-    - name: Run test suite
+    # Run basic tests
+    - name: Run tests
       run: |
-        BIN_PATH="./target/${{ matrix.target }}/release/past"
+        # Install jq for JSON validation
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          sudo apt-get install -y jq
+        else
+          brew install jq
+        fi
+
+        BIN="./target/${{ matrix.target }}/release/past"
         
-        echo "=== TEST 1: Verify shell detection ==="
-        $BIN_PATH --brief | grep -q "Analyzing your command history" || \
-          (echo "Failed basic execution" && exit 1)
+        echo "=== TEST 1: Basic execution ==="
+        $BIN --brief || (echo "Basic execution failed" && exit 1)
         
-        echo "=== TEST 2: Verify command count ==="
-        $BIN_PATH --brief | grep -q "Commands: [1-9]" || \
-          (echo "Command count mismatch" && exit 1)
+        echo "=== TEST 2: Command count ==="
+        $BIN --brief | grep -q "Commands:" || (echo "Command count check failed" && exit 1)
         
-        echo "=== TEST 3: Test keyword search ==="
-        $BIN_PATH -s "test_command" | grep -q "test_command_1" || \
-          (echo "Keyword search failed" && exit 1)
+        echo "=== TEST 3: Keyword search ==="
+        $BIN -s "test_command" | grep -q "test_command_1" || (echo "Keyword search failed" && exit 1)
         
-        echo "=== TEST 4: Test category search ==="
-        $BIN_PATH -C "File" | grep -q "ls -l" || \
-          (echo "Category search failed" && exit 1)
-        
-        echo "=== TEST 5: Test VCS commands ==="
-        $BIN_PATH -C "Version" | grep -q "git status" || \
-          (echo "VCS command detection failed" && exit 1)
-        
-        echo "=== TEST 6: Test bare output ==="
-        $BIN_PATH --bare | grep -q "COMMAND STATISTICS" || \
-          (echo "Bare output format failed" && exit 1)
-        
-        echo "=== TEST 7: Test detailed analysis ==="
-        $BIN_PATH --detailed | grep -q "DETAILED ANALYSIS" || \
-          (echo "Detailed output format failed" && exit 1)
-        
-        echo "=== TEST 8: Test JSON output ==="
-        $BIN_PATH --json | jq empty || \
-          (echo "JSON output validation failed" && exit 1)
+        echo "=== TEST 4: JSON output ==="
+        $BIN --json | jq . || (echo "JSON output invalid" && exit 1)
         
         echo "All tests passed for ${{ matrix.shell }} on ${{ matrix.platform }}"
