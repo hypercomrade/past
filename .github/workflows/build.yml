@@ -80,12 +80,14 @@ jobs:
 
       - name: Setup test history
         run: |
-          mkdir -p ~/.config ~/.local/share/fish
+          mkdir -p ~/.config
           cat > ~/.pastrc <<EOF
           [shell]
           shell_type = "${{ matrix.shell }}"
-          config_file = "${{ matrix.shell == 'fish' && \
-            '.config/fish/config.fish' || '.${matrix.shell}rc' }}"
+
+          config_file: >-
+          ${{ matrix.shell == 'fish' && '.config/fish/config.fish'
+          || format('.{0}rc', matrix.shell) }}
           EOF
 
           case "${{ matrix.shell }}" in
