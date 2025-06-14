@@ -3,7 +3,6 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::process::Command;
 use std::env;
 use regex::Regex;
 use serde_json::json;
@@ -19,6 +18,9 @@ use search::{
     search_commands_by_keyword, search_words_by_keyword, search_by_category,
     print_keyword_search_results, print_category_search_results
 };
+
+mod config;
+use config::get_shell_history;
 
 // Welcome to my shitty code :)
 
@@ -159,39 +161,6 @@ fn find_potential_mistypes(commands: &[String], command_frequency: &HashMap<&Str
     }
 
     mistyped_count
-}
-
-fn get_bash_history() -> Result<String, Box<dyn Error>> {
-    let home = env::var("HOME")?;
-    
-    let zsh_history_path = Path::new(&home).join(".zsh_history");
-    if let Ok(mut file) = File::open(&zsh_history_path) {
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        if !contents.is_empty() {
-            return Ok(contents);
-        }
-    }
-    
-    let bash_history_path = Path::new(&home).join(".bash_history");
-    if let Ok(mut file) = File::open(&bash_history_path) {
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        if !contents.is_empty() {
-            return Ok(contents);
-        }
-    }
-
-    match Command::new("bash")
-        .arg("-i")
-        .arg("-c")
-        .arg("history -r; history")
-        .output() {
-        Ok(output) if output.status.success() => {
-            Ok(String::from_utf8(output.stdout)?)
-        },
-        _ => Err("Could not retrieve shell history".into())
-    }
 }
 
 fn process_bash_history(history_text: &str) -> (Vec<String>, Vec<String>) {
@@ -519,11 +488,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         file.read_to_string(&mut contents)?;
         contents
     } else {
-        match get_bash_history() {
+        match get_shell_history() {
             Ok(text) => text,
             Err(e) => {
                 if !quiet {
-                    eprintln!("Failed to get live bash history ({}). Trying fallback method...", e);
+                    eprintln!("Failed to get live shell history ({}). Trying fallback method...", e);
                 }
                 let home = env::var("HOME")?;
                 let mut file = File::open(Path::new(&home).join(".bash_history"))?;
