@@ -99,7 +99,7 @@ pub fn get_shell_config() -> ShellConfig {
         }
         config
     } else {
-        // Fallback to bash if nothing else works //
+        // Fallback to bash if nothing else works
         ShellConfig::new("bash".to_string(), ".bashrc".to_string())
     }
 }
@@ -108,15 +108,36 @@ pub fn get_shell_history() -> Result<String, Box<dyn Error>> {
     let config = get_shell_config();
     let home = env::var("HOME")?;
     
-    // First try the shell's specific history file //
+    // First try the shell's specific history file
     let history_path = match config.shell_type.as_str() {
         "bash" => PathBuf::from(&home).join(".bash_history"),
         "zsh" => PathBuf::from(&home).join(".zsh_history"),
         "fish" => PathBuf::from(&home).join(".local/share/fish/fish_history"),
+        "ksh" => PathBuf::from(&home).join(".sh_history"),
         _ => PathBuf::from(&home).join(".bash_history"), // fallback
     };
     
-    if let Ok(mut file) = File::open(&history_path) {
+    // Special handling for fish history format
+    if config.shell_type == "fish" {
+        if let Ok(mut file) = File::open(&history_path) {
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            if !contents.is_empty() {
+                // Parse fish history format (cmd: <command>)
+                let commands: Vec<String> = contents.lines()
+                    .filter_map(|line| {
+                        if line.starts_with("- cmd: ") {
+                            Some(line[7..].to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                return Ok(commands.join("\n"));
+            }
+        }
+    } else if let Ok(mut file) = File::open(&history_path) {
+        // Standard handling for other shells
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         if !contents.is_empty() {
@@ -124,14 +145,36 @@ pub fn get_shell_history() -> Result<String, Box<dyn Error>> {
         }
     }
     
-    // Fallback to using the shell command //
+    // Fallback to using the shell command with shell-specific history commands
+    let history_command = match config.shell_type.as_str() {
+        "fish" => "history",
+        "ksh" => "history -r; history",
+        _ => "history -r; history", // bash/zsh default
+    };
+    
     match Command::new(&config.shell_type)
         .arg("-i")
         .arg("-c")
-        .arg("history -r; history")
+        .arg(history_command)
         .output() {
         Ok(output) if output.status.success() => {
-            Ok(String::from_utf8(output.stdout)?)
+            let mut history = String::from_utf8(output.stdout)?;
+            
+            // Clean up fish history output if needed
+            if config.shell_type == "fish" {
+                history = history.lines()
+                    .filter_map(|line| {
+                        if line.starts_with("- cmd: ") {
+                            Some(line[7..].to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n");
+            }
+            
+            Ok(history)
         },
         _ => Err("Could not retrieve shell history".into())
     }
