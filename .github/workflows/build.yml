@@ -1,4 +1,4 @@
-name: Cross-platform Build
+name: Cross-platform Build and Shell Testing
 
 on:
   push:
@@ -60,3 +60,60 @@ jobs:
       env:
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
       run: cargo build --target ${{ matrix.target }} --release
+
+  shell-tests:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shell: [bash, zsh, fish, ksh]
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Install Rust
+    - uses: dtolnay/rust-toolchain@stable
+    
+    # Install the shell being tested
+    - name: Install shell
+      run: |
+        sudo apt-get update
+        case "${{ matrix.shell }}" in
+          bash|zsh)
+            sudo apt-get install -y ${{ matrix.shell }} ;;
+          fish)
+            sudo apt-get install -y fish ;;
+          ksh)
+            sudo apt-get install -y ksh ;;
+        esac
+    
+    # Build the project
+    - name: Build
+      run: cargo build --release
+    
+    # Create test history file
+    - name: Setup test history
+      run: |
+        mkdir -p ~/.local/share/fish  # For fish history
+        echo "echo 'test command'" > test_history
+        case "${{ matrix.shell }}" in
+          fish)
+            echo "- cmd: echo 'test command'" > ~/.local/share/fish/fish_history ;;
+          ksh)
+            cp test_history ~/.sh_history ;;
+          bash)
+            cp test_history ~/.bash_history ;;
+          zsh)
+            cp test_history ~/.zsh_history ;;
+        esac
+    
+    # Run tests for the specific shell
+    - name: Test with ${{ matrix.shell }}
+      run: |
+        # Set the shell for the test
+        echo "Testing with ${{ matrix.shell }}"
+        ./target/release/past --brief
+        ./target/release/past -s "test"
+        
+        # Verify the shell was detected correctly
+        ./target/release/past --brief | grep -q "Commands: 1" || (echo "Command count mismatch" && exit 1)
+        ./target/release/past -s "test" | grep -q "test command" || (echo "Search failed" && exit 1)
