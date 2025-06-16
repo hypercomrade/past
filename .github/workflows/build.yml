@@ -50,19 +50,13 @@ jobs:
           install_linux() {
             sudo apt-get update
             sudo apt-get install -y $1 jq
-            if [[ "$1" == "fish" ]]; then
-              mkdir -p ~/.config/fish
-            fi
           }
-
           install_macos() {
+            brew install jq
             if [[ "$1" == "fish" ]]; then
               brew install fish
-              mkdir -p ~/.config/fish
             fi
-            brew install jq
           }
-
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             install_linux "${{ matrix.shell }}"
           else
@@ -72,17 +66,33 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
+      - name: Setup shell history
+        run: |
+          setup_history() {
+            echo "[shell]" > ~/.pastrc
+            echo "shell_type = \"$1\"" >> ~/.pastrc
+            if [[ "$1" == "fish" ]]; then
+              echo "config_file = \".config/fish/config.fish\"" >> ~/.pastrc
+              mkdir -p ~/.local/share/fish
+              echo "- cmd: ls" > ~/.local/share/fish/fish_history
+              echo "  when: $(date +%s)" >> ~/.local/share/fish/fish_history
+            else
+              echo "config_file = \".${1}rc\"" >> ~/.pastrc
+              echo "ls" > ~/.${1}_history
+            fi
+          }
+          setup_history "${{ matrix.shell }}"
+
+      - name: Run basic commands
+        run: |
+          ls > /dev/null
+          pwd > /dev/null
+
       - name: Run tests
         run: |
           test_shell() {
-            echo "Testing $1 shell on $2 architecture"
-            ls -la
+            echo "Testing $1 shell"
             ./target/release/past --brief || exit 1
-            ./target/release/past -s "test" | grep -q "test" || exit 1
+            ./target/release/past -s "ls" | grep -q "ls" || exit 1
           }
-
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            test_shell "${{ matrix.shell }}" "${{ matrix.platform }}"
-          else
-            test_shell "${{ matrix.shell }}" "macos"
-          fi
+          test_shell "${{ matrix.shell }}"
