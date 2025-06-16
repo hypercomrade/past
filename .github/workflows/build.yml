@@ -69,6 +69,9 @@ jobs:
             install_macos "${{ matrix.shell }}"
           fi
 
+      - name: Build release binary
+        run: cargo build --release
+
       - name: Run tests
         run: |
           test_shell() {
