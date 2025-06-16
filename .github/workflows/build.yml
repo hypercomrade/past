@@ -66,27 +66,39 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
-      - name: Setup shell history
+      - name: Setup shell environment
         run: |
-          setup_history() {
-            echo "[shell]" > ~/.pastrc
-            echo "shell_type = \"$1\"" >> ~/.pastrc
-            if [[ "$1" == "fish" ]]; then
-              echo "config_file = \".config/fish/config.fish\"" >> ~/.pastrc
-              mkdir -p ~/.local/share/fish
-              echo "- cmd: ls" > ~/.local/share/fish/fish_history
-              echo "  when: $(date +%s)" >> ~/.local/share/fish/fish_history
-            else
-              echo "config_file = \".${1}rc\"" >> ~/.pastrc
-              echo "ls" > ~/.${1}_history
-            fi
-          }
-          setup_history "${{ matrix.shell }}"
+          # Create config for past command
+          echo "[shell]" > ~/.pastrc
+          echo "shell_type = \"${{ matrix.shell }}\"" >> ~/.pastrc
 
-      - name: Run basic commands
+          # Shell-specific history setup
+          if [[ "${{ matrix.shell }}" == "fish" ]]; then
+            echo "config_file = \".config/fish/config.fish\"" >> ~/.pastrc
+            mkdir -p ~/.local/share/fish
+            echo "- cmd: ls" > ~/.local/share/fish/fish_history
+            echo "  when: $(date +%s)" >> ~/.local/share/fish/fish_history
+          else
+            echo "config_file = \".${{ matrix.shell }}rc\"" >> ~/.pastrc
+            echo "ls" > ~/.${{ matrix.shell }}_history
+          fi
+
+      - name: Run commands in target shell
         run: |
-          ls > /dev/null
-          pwd > /dev/null
+          case "${{ matrix.shell }}" in
+            bash)
+              bash -c 'ls; pwd; echo "test command"'
+              ;;
+            zsh)
+              zsh -c 'ls; pwd; echo "test command"'
+              ;;
+            fish)
+              fish -c 'ls; pwd; echo "test command"'
+              ;;
+            ksh)
+              ksh -c 'ls; pwd; echo "test command"'
+              ;;
+          esac
 
       - name: Run tests
         run: |
@@ -94,5 +106,6 @@ jobs:
             echo "Testing $1 shell"
             ./target/release/past --brief || exit 1
             ./target/release/past -s "ls" | grep -q "ls" || exit 1
+            ./target/release/past -s "test" | grep -q "test command" || exit 1
           }
           test_shell "${{ matrix.shell }}"
