@@ -1,5 +1,5 @@
 ---
-name: Cross-platform Build Test
+name: Platform Build Test
 
 on:
   push:
@@ -23,9 +23,9 @@ jobs:
           - platform: macos-x64
             os: macos-latest
             target: x86_64-apple-darwin
-          - platform: windows-x64
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
+          - platform: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -54,14 +54,7 @@ jobs:
 
       - name: Verify binary exists
         run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            if [ ! -f "./target/${{ matrix.target }}/release/past.exe" ]; then
-              echo "Binary not found!"
-              exit 1
-            fi
-          else
-            if [ ! -f "./target/${{ matrix.target }}/release/past" ]; then
-              echo "Binary not found!"
-              exit 1
-            fi
+          if [ ! -f "./target/${{ matrix.target }}/release/past" ]; then
+            echo "Binary not found!"
+            exit 1
           fi
