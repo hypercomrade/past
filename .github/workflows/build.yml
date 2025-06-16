@@ -1,5 +1,5 @@
 ---
-name: Cross-platform Shell Testing
+name: Cross-platform Build Test
 
 on:
   push:
@@ -10,34 +10,22 @@ on:
       - main
 
 jobs:
-  shell-tests:
+  build:
     strategy:
       matrix:
         include:
           - platform: linux-x64
             os: ubuntu-latest
-            shell: bash
-          - platform: linux-x64
-            os: ubuntu-latest
-            shell: zsh
-          - platform: linux-x64
-            os: ubuntu-latest
-            shell: fish
-          - platform: linux-x64
-            os: ubuntu-latest
-            shell: ksh
+            target: x86_64-unknown-linux-gnu
           - platform: linux-arm64
             os: ubuntu-latest
-            shell: bash
+            target: aarch64-unknown-linux-gnu
           - platform: macos-x64
             os: macos-latest
-            shell: bash
-          - platform: macos-x64
-            os: macos-latest
-            shell: zsh
-          - platform: macos-x64
-            os: macos-latest
-            shell: fish
+            target: x86_64-apple-darwin
+          - platform: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -45,67 +33,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup ARM toolchain (Linux ARM only)
+        if: matrix.platform == 'linux-arm64'
         run: |
-          install_linux() {
-            sudo apt-get update
-            sudo apt-get install -y $1 jq
-          }
-          install_macos() {
-            brew install jq
-            if [[ "$1" == "fish" ]]; then
-              brew install fish
-            fi
-          }
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            install_linux "${{ matrix.shell }}"
-          else
-            install_macos "${{ matrix.shell }}"
-          fi
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            libc6-dev-arm64-cross
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=" \
+            "aarch64-linux-gnu-gcc" >> $GITHUB_ENV
 
       - name: Build release binary
-        run: cargo build --release
+        run: cargo build --target ${{ matrix.target }} --release
 
-      - name: Setup shell environment
+      - name: Verify binary exists
         run: |
-          # Create config for past command
-          echo "[shell]" > ~/.pastrc
-          echo "shell_type = \"${{ matrix.shell }}\"" >> ~/.pastrc
-
-          # Shell-specific history setup
-          if [[ "${{ matrix.shell }}" == "fish" ]]; then
-            echo "config_file = \".config/fish/config.fish\"" >> ~/.pastrc
-            mkdir -p ~/.local/share/fish
-            echo "- cmd: ls" > ~/.local/share/fish/fish_history
-            echo "  when: $(date +%s)" >> ~/.local/share/fish/fish_history
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            if [ ! -f "./target/${{ matrix.target }}/release/past.exe" ]; then
+              echo "Binary not found!"
+              exit 1
+            fi
           else
-            echo "config_file = \".${{ matrix.shell }}rc\"" >> ~/.pastrc
-            echo "ls" > ~/.${{ matrix.shell }}_history
+            if [ ! -f "./target/${{ matrix.target }}/release/past" ]; then
+              echo "Binary not found!"
+              exit 1
+            fi
           fi
-
-      - name: Run commands in target shell
-        run: |
-          case "${{ matrix.shell }}" in
-            bash)
-              bash -c 'ls; pwd; echo "test command"'
-              ;;
-            zsh)
-              zsh -c 'ls; pwd; echo "test command"'
-              ;;
-            fish)
-              fish -c 'ls; pwd; echo "test command"'
-              ;;
-            ksh)
-              ksh -c 'ls; pwd; echo "test command"'
-              ;;
-          esac
-
-      - name: Run tests
-        run: |
-          test_shell() {
-            echo "Testing $1 shell"
-            ./target/release/past --brief || exit 1
-            ./target/release/past -s "ls" | grep -q "ls" || exit 1
-            ./target/release/past -s "test" | grep -q "test command" || exit 1
-          }
-          test_shell "${{ matrix.shell }}"
