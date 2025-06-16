@@ -94,9 +94,13 @@ jobs:
           mkdir -p ~/.config
           echo "[shell]" > ~/.pastrc
           echo "shell_type = \"${{ matrix.shell }}\"" >> ~/.pastrc
-          echo "config_file = \"${{ matrix.shell == 'fish' && " \
-            "'.config/fish/config.fish' || " \
-            "'.${matrix.shell}rc' }}\"" >> ~/.pastrc
+
+          if [[ "${{ matrix.shell }}" == "fish" ]]; then
+            config_file=".config/fish/config.fish"
+          else
+            config_file=".${{ matrix.shell }}rc"
+          fi
+          echo "config_file = \"$config_file\"" >> ~/.pastrc
 
           if [[ "${{ matrix.shell }}" == "fish" ]]; then
             mkdir -p ~/.local/share/fish
