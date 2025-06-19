@@ -419,7 +419,7 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
 
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("past")
-        .version("0.1")
+        .version("0.5")
         .author("Mikhail Ukrainetz <mckaylbing@gmail.com>")
         .about("The history analysis command for Unix-like systems")
         .setting(AppSettings::ArgRequiredElseHelp)
