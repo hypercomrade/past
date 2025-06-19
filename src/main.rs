@@ -9,6 +9,7 @@ use serde_json::json;
 use clap::{Arg, App, ArgMatches, AppSettings};
 use thousands::Separable;
 use lazy_static::lazy_static;
+use csv::Writer;
 
 mod interactive;
 use interactive::interactive_search;
@@ -21,8 +22,6 @@ use search::{
 
 mod config;
 use config::get_shell_history;
-
-// Welcome to my shitty code :)
 
 lazy_static! {
     static ref NAV_COMMANDS: Vec<&'static str> = vec!["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
@@ -386,6 +385,145 @@ fn print_boxed_stats(commands: &[String], words: &[String]) {
     }
 }
 
+fn write_csv_output(filename: &str, records: &[Vec<String>]) -> Result<(), Box<dyn Error>> {
+    let mut wtr = Writer::from_path(filename)?;
+    
+    for record in records {
+        wtr.write_record(record)?;
+    }
+    
+    wtr.flush()?;
+    println!("CSV output written to {}", filename);
+    Ok(())
+}
+
+fn generate_detailed_csv(commands: &[String], words: &[String], category_counts: &HashMap<String, usize>) -> Vec<Vec<String>> {
+    let mut records = Vec::new();
+    
+    // Header
+    records.push(vec![
+        "Metric".to_string(),
+        "Value".to_string(),
+        "Percentage".to_string()
+    ]);
+    
+    // Basic stats
+    let total_commands = commands.len();
+    let unique_commands = commands.iter().collect::<HashSet<_>>().len();
+    let total_words = words.len();
+    let unique_words = words.iter().collect::<HashSet<_>>().len();
+    
+    records.push(vec![
+        "Total Commands".to_string(),
+        total_commands.to_string(),
+        "100%".to_string()
+    ]);
+    
+    records.push(vec![
+        "Unique Commands".to_string(),
+        unique_commands.to_string(),
+        format!("{:.1}%", (unique_commands as f64 / total_commands as f64) * 100.0)
+    ]);
+    
+    records.push(vec![
+        "Total Keywords".to_string(),
+        total_words.to_string(),
+        "100%".to_string()
+    ]);
+    
+    records.push(vec![
+        "Unique Keywords".to_string(),
+        unique_words.to_string(),
+        format!("{:.1}%", (unique_words as f64 / total_words as f64) * 100.0)
+    ]);
+    
+    // Command complexity
+    let cmd_lengths: Vec<usize> = commands.iter().map(|c| c.len()).collect();
+    let avg_length = cmd_lengths.iter().sum::<usize>() as f64 / total_commands as f64;
+    let max_length = *cmd_lengths.iter().max().unwrap_or(&0);
+    let min_length = *cmd_lengths.iter().min().unwrap_or(&0);
+    
+    records.push(vec![
+        "Average Command Length".to_string(),
+        format!("{:.1}", avg_length),
+        "".to_string()
+    ]);
+    
+    records.push(vec![
+        "Shortest Command".to_string(),
+        min_length.to_string(),
+        "".to_string()
+    ]);
+    
+    records.push(vec![
+        "Longest Command".to_string(),
+        max_length.to_string(),
+        "".to_string()
+    ]);
+    
+    // Categories
+    records.push(vec!["Categories".to_string(), "Count".to_string(), "Percentage".to_string()]);
+    
+    let total_categories: usize = category_counts.values().sum();
+    let mut sorted_categories: Vec<_> = category_counts.iter().collect();
+    sorted_categories.sort_by(|a, b| b.1.cmp(a.1));
+    
+    for (category, count) in sorted_categories {
+        let percentage = (*count as f64 / total_categories as f64) * 100.0;
+        records.push(vec![
+            category.clone(),
+            count.to_string(),
+            format!("{:.1}%", percentage)
+        ]);
+    }
+    
+    records
+}
+
+fn generate_search_csv(matching_commands: &[String], matching_words: &[String]) -> Vec<Vec<String>> {
+    let mut records = Vec::new();
+    
+    // Header
+    records.push(vec!["Type".to_string(), "Match".to_string()]);
+    
+    // Commands
+    for cmd in matching_commands {
+        records.push(vec!["Command".to_string(), cmd.clone()]);
+    }
+    
+    // Words
+    for word in matching_words {
+        records.push(vec!["Keyword".to_string(), word.clone()]);
+    }
+    
+    records
+}
+
+fn generate_category_csv(matching_commands: &[String]) -> Vec<Vec<String>> {
+    let mut records = Vec::new();
+    
+    // Header
+    records.push(vec!["Category".to_string(), "Command".to_string()]);
+    
+    // Group commands by category
+    let mut categorized: HashMap<String, Vec<String>> = HashMap::new();
+    for cmd in matching_commands {
+        let categories = categorize_command(cmd);
+        for cat in categories {
+            categorized.entry(cat).or_default().push(cmd.clone());
+        }
+    }
+    
+    // Add to records
+    for (category, commands) in categorized {
+        for cmd in commands {
+            records.push(vec![category.clone(), cmd]);
+        }
+    }
+    
+    records
+}
+
 fn print_statistics(commands: &[String], words: &[String], category_counts: &HashMap<String, usize>, matches: &ArgMatches) {
     if matches.is_present("json") {
         let result = json!({
@@ -396,6 +534,14 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
             "categories": category_counts
         });
         println!("{}", serde_json::to_string_pretty(&result).unwrap());
+        return;
+    }
+
+    if matches.is_present("csv") {
+        let csv_data = generate_detailed_csv(commands, words, category_counts);
+        if let Err(e) = write_csv_output("command_history.csv", &csv_data) {
+            eprintln!("Failed to write CSV: {}", e);
+        }
         return;
     }
 
@@ -434,6 +580,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             .short("j")
             .long("json")
             .help("Output in JSON format"))
+        .arg(Arg::with_name("csv")
+            .long("csv")
+            .help("Output detailed analysis to CSV file"))
         .arg(Arg::with_name("bare")
             .short("r")
             .long("bare")
@@ -473,7 +622,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .long("interactive")
             .help("Interactive command search")
             .conflicts_with_all(&["search", "category"]))
-        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past -f ~/.zsh_history  # Analyze zsh history\n  past -s \"git\"  # Search for \"git\" in commands\n  past -C \"Lang\" # Search for language-related commands\n  past -i      # Interactive search mode")
+        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past --csv   # Output detailed analysis to CSV\n  past -f ~/.zsh_history  # Analyze zsh history\n  past -s \"git\"  # Search for \"git\" in commands\n  past -C \"Lang\" # Search for language-related commands\n  past -i      # Interactive search mode")
         .get_matches();
 
     let quiet = matches.is_present("quiet");
@@ -534,7 +683,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(pattern) = matches.value_of("search") {
         let matching_commands = search_commands_by_keyword(&commands, pattern, case_sensitive);
         let matching_words = search_words_by_keyword(&words, pattern, case_sensitive);
-        print_keyword_search_results(&matching_commands, &matching_words);
+        
+        if matches.is_present("csv") {
+            // Convert HashSet to Vec for CSV generation
+            let matching_commands_vec: Vec<String> = matching_commands.iter().cloned().collect();
+            let matching_words_vec: Vec<String> = matching_words.iter().cloned().collect();
+            let csv_data = generate_search_csv(&matching_commands_vec, &matching_words_vec);
+            if let Err(e) = write_csv_output("search_results.csv", &csv_data) {
+                eprintln!("Failed to write CSV: {}", e);
+            }
+        } else {
+            print_keyword_search_results(&matching_commands, &matching_words);
+        }
     } else if let Some(category_pattern) = matches.value_of("category") {
         let (matching_commands, matching_categories) = search_by_category(
             &commands,
@@ -542,7 +702,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             case_sensitive,
             &category_counts
         );
-        print_category_search_results(&matching_commands, &matching_categories);
+        
+        if matches.is_present("csv") {
+            let csv_data = generate_category_csv(&matching_commands);
+            if let Err(e) = write_csv_output("category_results.csv", &csv_data) {
+                eprintln!("Failed to write CSV: {}", e);
+            }
+        } else {
+            print_category_search_results(&matching_commands, &matching_categories);
+        }
     }
 
     Ok(())
