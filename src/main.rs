@@ -42,7 +42,7 @@ lazy_static! {
     static ref CONTAINERS: Vec<&'static str> = vec!["docker ", "podman", "kubectl", "oc ", "ctr", "nerdctl", "lxc", "lxd", "vagrant", 
                      "virsh", "qemu", "lima", "colima"];
     static ref SHELL_BUILTINS: Vec<&'static str> = vec!["export", "source", "alias", "echo", "printf", "read", "set", "unset", "type", 
-                         "hash", "history", "fc", "jobs", "bg", "fg", "wait", "times", "trap"];
+                         "hash", "history", "fc", "jobs", "bg", "fg", "wait", "times", "trap", "clear"];
     
     static ref LANGUAGES: Vec<(&'static str, Vec<&'static str>)> = vec![
         ("Rust", vec![
