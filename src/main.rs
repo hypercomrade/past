@@ -566,7 +566,7 @@ fn print_statistics(commands: &[String], words: &[String], category_counts: &Has
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("past")
         .version("0.5")
-        .author("Mikhail Ukrainetz <mckaylbing@gmail.com>")
+        .author("Mikhail Ukrainetz and Noah Roberts")
         .about("The history analysis command for Unix-like systems")
         .setting(AppSettings::ArgRequiredElseHelp)
         .setting(AppSettings::ColoredHelp)
