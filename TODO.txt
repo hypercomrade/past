@@ -1,0 +1,1 @@
+Add area search mode (search and return the history with certain keywords between it)
