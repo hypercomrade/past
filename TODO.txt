@@ -7,3 +7,5 @@ Better github runners (not sure how to test those)
 Estimate runtimes and scalability of current commands (probably bad), may want to switch to a binary search tree at some point
 
 Consider an actual database for common commands
+
+Add that past works over ssh fine, and that it supports Rocky Linux
