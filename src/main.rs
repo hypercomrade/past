@@ -660,7 +660,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
-    // Handle interactive search before other operations
+    // Handle interactive search before other operations //
     if matches.is_present("interactive") {
         if let Some(selected_command) = interactive_search(&commands) {
             println!("{}", selected_command);
@@ -678,7 +678,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     print_statistics(&commands, &words, &category_counts, &matches);
 
-    // Handle search operations
+    // Handle search operations //
     let case_sensitive = matches.is_present("case-sensitive");
     
     if let Some(pattern) = matches.value_of("search") {
