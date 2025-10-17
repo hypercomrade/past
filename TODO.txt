@@ -1,1 +1,7 @@
-Add area search mode (search and return the history with certain keywords between it)
+Session Search (add timestamps to commands in the hist file)
+
+Fix -i search bar not filling
+
+Better github runners (not sure how to test those)
+
+Estimate runtimes and scalability of current commands (probably bad)
