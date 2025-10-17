@@ -23,6 +23,7 @@ use search::{
 mod config;
 use config::get_shell_history;
 
+// Should probably make this a database at some point //
 lazy_static! {
     static ref NAV_COMMANDS: Vec<&'static str> = vec!["cd ", "ls", "pwd", "dir", "pushd", "popd", "ll", "tree", "exa", "fd", "ranger", "nnn", "lf"];
     static ref FILE_OPS: Vec<&'static str> = vec!["cp ", "mv ", "rm ", "mkdir", "touch", "chmod", "chown", "ln ", "rsync", "tar ", 
@@ -400,14 +401,14 @@ fn write_csv_output(filename: &str, records: &[Vec<String>]) -> Result<(), Box<d
 fn generate_detailed_csv(commands: &[String], words: &[String], category_counts: &HashMap<String, usize>) -> Vec<Vec<String>> {
     let mut records = Vec::new();
     
-    // Header
+    // Header //
     records.push(vec![
         "Metric".to_string(),
         "Value".to_string(),
         "Percentage".to_string()
     ]);
     
-    // Basic stats
+    // Basic stats //
     let total_commands = commands.len();
     let unique_commands = commands.iter().collect::<HashSet<_>>().len();
     let total_words = words.len();
@@ -437,7 +438,7 @@ fn generate_detailed_csv(commands: &[String], words: &[String], category_counts:
         format!("{:.1}%", (unique_words as f64 / total_words as f64) * 100.0)
     ]);
     
-    // Command complexity
+    // Command complexity (fairly arbitary) //
     let cmd_lengths: Vec<usize> = commands.iter().map(|c| c.len()).collect();
     let avg_length = cmd_lengths.iter().sum::<usize>() as f64 / total_commands as f64;
     let max_length = *cmd_lengths.iter().max().unwrap_or(&0);
@@ -461,7 +462,7 @@ fn generate_detailed_csv(commands: &[String], words: &[String], category_counts:
         "".to_string()
     ]);
     
-    // Categories
+    // Categories //
     records.push(vec!["Categories".to_string(), "Count".to_string(), "Percentage".to_string()]);
     
     let total_categories: usize = category_counts.values().sum();
@@ -483,15 +484,15 @@ fn generate_detailed_csv(commands: &[String], words: &[String], category_counts:
 fn generate_search_csv(matching_commands: &[String], matching_words: &[String]) -> Vec<Vec<String>> {
     let mut records = Vec::new();
     
-    // Header
+    // Header //
     records.push(vec!["Type".to_string(), "Match".to_string()]);
     
-    // Commands
+    // Commands //
     for cmd in matching_commands {
         records.push(vec!["Command".to_string(), cmd.clone()]);
     }
     
-    // Words
+    // Words //
     for word in matching_words {
         records.push(vec!["Keyword".to_string(), word.clone()]);
     }
@@ -502,10 +503,10 @@ fn generate_search_csv(matching_commands: &[String], matching_words: &[String]) 
 fn generate_category_csv(matching_commands: &[String]) -> Vec<Vec<String>> {
     let mut records = Vec::new();
     
-    // Header
+    // Header //
     records.push(vec!["Category".to_string(), "Command".to_string()]);
     
-    // Group commands by category
+    // Group commands by category //
     let mut categorized: HashMap<String, Vec<String>> = HashMap::new();
     for cmd in matching_commands {
         let categories = categorize_command(cmd);
@@ -514,7 +515,7 @@ fn generate_category_csv(matching_commands: &[String]) -> Vec<Vec<String>> {
         }
     }
     
-    // Add to records
+    // Add to records //
     for (category, commands) in categorized {
         for cmd in commands {
             records.push(vec![category.clone(), cmd]);

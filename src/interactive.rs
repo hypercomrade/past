@@ -9,17 +9,17 @@ use tui::widgets::{Block, Borders, List, ListItem};
 use tui::layout::{Layout, Constraint, Direction};
 
 pub fn interactive_search(commands: &[String]) -> Option<String> {
-    // Set up terminal
+    // Set up terminal //
     let stdout = io::stdout().into_raw_mode().ok()?;
     let stdout = stdout.into_alternate_screen().ok()?;
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend).ok()?;
 
-    // Initial state
+    // Initial state (empty search) //
     let mut input = String::new();
     let mut selected = 0;
     
-    // Create a vector of unique commands in reverse order (most recent first)
+    // Create a vector of unique commands in reverse order (most recent first) //
     let mut unique_commands = Vec::new();
     for cmd in commands.iter().rev() {
         if !unique_commands.iter().any(|x| *x == cmd) {
@@ -29,17 +29,17 @@ pub fn interactive_search(commands: &[String]) -> Option<String> {
     let mut filtered_commands: Vec<&String> = unique_commands.clone();
 
     loop {
-        // Filter commands based on input
+        // Filter commands based on input //
         filtered_commands = unique_commands
             .iter()
             .filter(|cmd| cmd.to_lowercase().contains(&input.to_lowercase()))
             .copied()
             .collect();
 
-        // Limit to 30 most recent matches
+        // Limit to 30 most recent matches (temp for now) //
         let display_commands = filtered_commands.iter().take(30).collect::<Vec<_>>();
 
-        // Draw the UI
+        // Draw UI //
         terminal.draw(|f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -76,7 +76,7 @@ pub fn interactive_search(commands: &[String]) -> Option<String> {
             f.render_widget(list, chunks[1]);
         }).ok()?;
 
-        // Handle input
+        // Handle user input //
         if let Some(key) = io::stdin().lock().keys().next() {
             match key.unwrap() {
                 Key::Char('\n') => {
@@ -86,29 +86,29 @@ pub fn interactive_search(commands: &[String]) -> Option<String> {
                     }
                 }
                 Key::Char(c) => {
-                    // Add character to search
+                    // Add character to search //
                     input.push(c);
                     selected = 0;
                 }
                 Key::Backspace => {
-                    // Remove last character
+                    // Remove last character //
                     input.pop();
                     selected = 0;
                 }
                 Key::Up => {
-                    // Move selection up
+                    // Move selection up //
                     if selected > 0 {
                         selected -= 1;
                     }
                 }
                 Key::Down => {
-                    // Move selection down
+                    // Move selection down //
                     if selected < display_commands.len().saturating_sub(1) {
                         selected += 1;
                     }
                 }
                 Key::Esc => {
-                    // Exit without selection
+                    // Exit without selection //
                     return None;
                 }
                 _ => {}
