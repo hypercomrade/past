@@ -26,7 +26,7 @@ Please keep in mind that past can still run on many non listed systems. These ar
 ### **Quick Start**
 ```bash
 # Clone and build
-git clone https://github.com/KaylBing/past
+https://github.com/hypercomrade/past
 cd past
 cargo build --release
 
