@@ -9,3 +9,6 @@ Estimate runtimes and scalability of current commands (probably bad), may want t
 Consider an actual database for common commands
 
 Add that past works over ssh fine, and that it supports Rocky Linux
+
+look into bug where cargo commands do not show up in past -i
+
