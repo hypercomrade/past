@@ -33,4 +33,4 @@ cargo build --release
 # Aliasing (until we are approved for brew and apt)
 # The cleanest way to use our command for now, is to add something like this to your .bashrc
 
-alias past='/path/to/repo/past/target/release/past'
+alias past='/path/to/repo/past/target/release/past/target/release/past'
