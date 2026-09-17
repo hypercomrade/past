@@ -18,6 +18,7 @@ The goal of `past` is to be modern take on the `history` command - allowing you 
 ### **Officially Supported Systems**
 ![Debian x86_64](https://img.shields.io/badge/Debian-x86__64-red?logo=debian)
 ![Debian ARM64](https://img.shields.io/badge/Debian-ARM64-red?logo=debian)
+
 ![macOS Intel](https://img.shields.io/badge/macOS-x86__64-black?logo=apple)
 ![macOS ARM](https://img.shields.io/badge/macOS-ARM64-black?logo=apple)
 

@@ -18,3 +18,7 @@ Add a man file to the repo and eventually the man command.
 Add the options for the past -i command to sort found commands by most common etc, give the user more control
 ######
 
+Look into switching to .elf files or something more UNIX standard.
+
+Design/look at a better or more unique way to store history. Such as a fm-index, or something more compressable and searchable. 
+In this you could include a flag for past that would then index all of your commands from your history into this new index.
