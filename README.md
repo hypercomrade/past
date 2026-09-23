@@ -1,8 +1,8 @@
 ## past
 
-**The history analysis command for Unix-like shells** (sorry PowerShell fans).
+**The new history analysis command for Unix-like shells** (sorry PowerShell fans).
 
-The goal of `past` is to be modern take on the `history` command - allowing you to see usage patterns, trends, and generally look back on your command history in a feature rich way. Currently features include:
+The goal of `past` is to be modern take on the `history` command. Primarily by focusing on search functions and other quality of life improvements. Currently features include:
 
 - Summary statistics of your command usage (`--brief or --detailed`)
 - Category-based search (`-C/--category`)
@@ -22,7 +22,7 @@ The goal of `past` is to be modern take on the `history` command - allowing you 
 ![macOS Intel](https://img.shields.io/badge/macOS-x86__64-black?logo=apple)
 ![macOS ARM](https://img.shields.io/badge/macOS-ARM64-black?logo=apple)
 
-Please keep in mind that past can still run on many non listed systems. These are just the most supported and documented ones.
+Please keep in mind that past may still run on many non listed systems. These are just the most supported and documented ones.
 
 ### **Quick Start**
 ```bash
