@@ -22,3 +22,5 @@ Look into switching to .elf files or something more UNIX standard.
 
 Design/look at a better or more unique way to store history. Such as a fm-index, or something more compressable and searchable. 
 In this you could include a flag for past that would then index all of your commands from your history into this new index.
+
+Fake history generator to test search efficiency etc
