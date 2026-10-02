@@ -4,6 +4,7 @@ use std::env;
 use std::process::Command;
 use std::io::{self, Write};
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 
 use serde::{Serialize, Deserialize};
 use std::error::Error;
