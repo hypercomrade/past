@@ -50,6 +50,7 @@ jobs:
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "CC_aarch64-unknown-linux-gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "CXX_aarch64-unknown-linux-gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+          sudo apt install libssl-dev
 
       - name: Build release binary
         run: cargo build --target ${{ matrix.target }} --release
