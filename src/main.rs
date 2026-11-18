@@ -623,7 +623,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             .long("interactive")
             .help("Interactive command search")
             .conflicts_with_all(&["search", "category"]))
-        .after_help("EXAMPLES:\n  past         # Default boxed output\n  past -r      # Plain text output\n  past -b      # Brief summary\n  past -d      # Detailed analysis\n  past --csv   # Output detailed analysis to CSV\n  past -f ~/.zsh_history  # Analyze zsh history\n  past -s \"git\"  # Search for \"git\" in commands\n  past -C \"Lang\" # Search for language-related commands\n  past -i      # Interactive search mode")
         .get_matches();
 
     let quiet = matches.is_present("quiet");
