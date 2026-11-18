@@ -1,0 +1,2 @@
+This document exists to point out why we chose to make various choices throughout the 
+creation of this software. 
